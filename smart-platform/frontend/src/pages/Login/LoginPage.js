@@ -60,7 +60,7 @@ const LoginPage = () => {
 
             <Form onSubmit={handleLogin}>
                 <Form.Group className="mb-3" controlId="formPseudo">
-                    <Form.Label>Pseudonyme</Form.Label>
+                    <Form.Label>Pseudonyme (vous pouvez retrouver votre pseudo dans l'email de validation)</Form.Label>
                     <Form.Control
                         type="text"
                         placeholder="Entrez votre pseudo"

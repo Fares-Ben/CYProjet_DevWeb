@@ -103,6 +103,8 @@ app.post('/api/login', async (req, res) => {
     );
 
     if (!users.length) return res.status(401).json({ error: 'Utilisateur introuvable' });
+    if (users[0].email_verified === 0) return res.status(401).json({ error: 'Veuiller valider votre adresse email afin de vous connecter.' });
+
 
     const user = users[0];
     const valid = await bcrypt.compare(password, user.password);
@@ -599,10 +601,10 @@ app.post('/api/register', async (req, res) => {
           
           <!-- Corps du message -->
           <div style="padding: 25px;">
-            <p style="font-size: 16px;">Bonjour,</p>
-            
+            <p style="font-size: 16px;">Bonjour,</p>            
             <p style="font-size: 16px;">Merci d'avoir rejoint notre plateforme intelligente pour établissements scolaires. Pour activer votre compte, veuillez confirmer votre adresse email :</p>
-            
+                        <p style="font-size: 16px;">Après validation, votre pseudo sera : ${finalPseudo}</p> </br>
+
             <div style="text-align: center; margin: 30px 0;">
               <a href="${confirmationLink}" 
                  style="background-color: #4a6fa5; color: white; padding: 12px 24px; 
