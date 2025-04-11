@@ -305,6 +305,11 @@ app.post('/api/admin/validate-user/:id', authenticateToken, isAdmin, async (req,
       [req.user.id, req.params.id, 0, 1]
     );
 
+    await db.promise().query(
+      'UPDATE users SET points = points + 1 WHERE id = ?',
+      [req.params.id]
+    );
+
     res.json({
       message: 'Validation réussie',
       deletedId: req.params.id
