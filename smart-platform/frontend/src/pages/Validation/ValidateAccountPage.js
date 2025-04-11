@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Alert, Spinner, Container, Button } from 'react-bootstrap';
 import axios from 'axios';
 import { useSearchParams } from 'react-router-dom';
@@ -10,22 +10,31 @@ const ValidateAccountPage = () => {
     const [searchParams] = useSearchParams();
     const token = searchParams.get('token');
     const navigate = useNavigate();
-
     useEffect(() => {
         const validateAccount = async () => {
             try {
                 console.log('Token envoyé à l\'API :', token);
+                console.log("ici ok ? on est juste avant ici");
 
+                // Requête pour valider l'account avec le token
                 const response = await axios.get(`http://localhost:3001/api/validate-account?token=${token}`, {
                     headers: {
                         'Content-Type': 'application/json'
                     }
                 });
 
+                // Envoi de la requête pour valider l'email avec l'ID récupéré
+                await axios.post(`http://localhost:3001/api/validate-email/${response.data.userID}`, {}, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
 
-                if (response.status === 200) {  // Utilisez response.status au lieu de response.ok
+                // Vérification du succès de la réponse de la validation du compte
+                if (response.status === 200) {
                     setStatus('success');
-                    setMessage(response.data.message);  // Accès via .data
+                    setMessage(response.data.message);  // Message de succès
                 } else {
                     setStatus('error');
                     setMessage(response.data.error || 'Erreur inconnue');
@@ -52,6 +61,7 @@ const ValidateAccountPage = () => {
             validateAccount();
         }
     }, [token]);
+
 
     return (
         <Container className="my-5">
