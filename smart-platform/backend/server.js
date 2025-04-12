@@ -105,6 +105,8 @@ app.post('/api/login', async (req, res) => {
     );
 
     if (!users.length) return res.status(401).json({ error: 'Utilisateur introuvable' });
+    if (users[0].email_verified === 0) return res.status(401).json({ error: 'Veuiller valider votre adresse email afin de vous connecter.' });
+
 
     const user = users[0];
     const valid = await bcrypt.compare(password, user.password);
@@ -244,6 +246,36 @@ app.get('/api/admin/stats', authenticateToken, isAdmin, async (req, res) => {
   }
 });
 
+// Endpoint pour valider un utilisateur
+app.post('/api/validate-email/:id', async (req, res) => {
+  const { id } = req.params;  // Récupération de l'ID à partir des paramètres de l'URL
+
+  try {
+
+    // Commence par effectuer les requêtes de mise à jour et attends qu'elles se terminent
+    await db.promise().query('UPDATE users SET email_verified = 1 WHERE id = ?', [id]);
+
+    await db.promise().query('UPDATE users SET validation_token = null WHERE id = ?', [id]);
+    await db.promise().query('UPDATE users SET token_expiration = null WHERE id = ?', [id]);
+    // 3. Enregistrement dans l'historique
+    await db.promise().query(
+      `INSERT INTO Users_activity 
+      (ID_user_changeur, ID_user_modified, type, ancienne_donnee, nouvelle_donnee, date) 
+      VALUES ('0', ?, 'VALIDATION EMAIL', ?, ?, NOW())`,
+      [req.params.id, 0, 1]
+    );
+
+    // Une fois toutes les requêtes terminées, envoie une réponse au client
+    res.status(200).json({ message: 'L\'email a été validé avec succès.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      error: 'Erreur de validation demail',
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+  }
+});
+
 
 app.get('/api/admin/events', authenticateToken, isAdmin, (req, res) => {
   db.query('SELECT * FROM events', (err, results) => {
@@ -273,6 +305,11 @@ app.post('/api/admin/validate-user/:id', authenticateToken, isAdmin, async (req,
       (ID_user_changeur, ID_user_modified, type, ancienne_donnee, nouvelle_donnee, date) 
       VALUES (?, ?, 'VALIDATION USER', ?, ?, NOW())`,
       [req.user.id, req.params.id, 0, 1]
+    );
+
+    await db.promise().query(
+      'UPDATE users SET points = points + 1 WHERE id = ?',
+      [req.params.id]
     );
 
     res.json({
@@ -571,10 +608,10 @@ app.post('/api/register', async (req, res) => {
           
           <!-- Corps du message -->
           <div style="padding: 25px;">
-            <p style="font-size: 16px;">Bonjour,</p>
-            
+            <p style="font-size: 16px;">Bonjour,</p>            
             <p style="font-size: 16px;">Merci d'avoir rejoint notre plateforme intelligente pour établissements scolaires. Pour activer votre compte, veuillez confirmer votre adresse email :</p>
-            
+                        <p style="font-size: 16px;">Après validation, votre pseudo sera : ${finalPseudo}</p> </br>
+
             <div style="text-align: center; margin: 30px 0;">
               <a href="${confirmationLink}" 
                  style="background-color: #4a6fa5; color: white; padding: 12px 24px; 
@@ -603,17 +640,20 @@ app.post('/api/register', async (req, res) => {
     };
 
     await transporter.sendMail(mailOptions);
-
-    res.status(201).json({
-      message: 'Utilisateur enregistré avec succès. Un email de confirmation a été envoyé.',
-      token: validationToken,
-      email: email
-    });
-
     const [users] = await db.promise().query(
       'SELECT id, token_expiration FROM users WHERE validation_token = ?',
       [validationToken]
     );
+
+    const user = users[0];
+
+    res.status(201).json({
+      message: 'Utilisateur enregistré avec succès. Un email de confirmation a été envoyé.',
+      token: validationToken,
+      email: email,
+      userID: user.id
+    });
+
 
   } catch (err) {
     console.error('Erreur lors de l\'inscription :', err);
@@ -670,7 +710,10 @@ app.get('/api/validate-account', async (req, res) => {
     }
 
 
-    res.status(200).json({ message: 'Compte validé avec succès. Vous pouvez maintenant vous connecter.' });
+    res.status(200).json({
+      message: 'Compte validé avec succès. Vous pouvez maintenant vous connecter.',
+      userID: user.id
+    });
 
   } catch (err) {
     console.error('Erreur lors de la validation du compte :', err);
@@ -699,6 +742,67 @@ app.get('/api/admin/class-students/:classId', authenticateToken, isAdmin, (req, 
     res.json(results);
   });
 });
+
+
+
+// ✅ Récupérer tous les appareils
+app.get('/api/admin/get-devices', authenticateToken, async (req, res) => {
+  const [rows] = await db.promise().query('SELECT * FROM smart_devices');
+  res.json(rows);
+});
+
+// ✅ Créer un appareil
+app.post('/api/admin/post-devices', authenticateToken, async (req, res) => {
+  const {
+    name, type, location, etat,
+    consommation, Date_derniere_activite,
+    Date_debut_maintenance, Date_fin_maintenance
+  } = req.body;
+
+  await db.promise().query(`
+      INSERT INTO smart_devices 
+      (name, type, location, etat, consommation, Date_derniere_activite, Date_debut_maintenance, Date_fin_maintenance)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `, [
+    name, type, location, etat,
+    consommation || null,
+    Date_derniere_activite || null,
+    Date_debut_maintenance || null,
+    Date_fin_maintenance || null
+  ]);
+
+  res.status(201).json({ message: 'Appareil créé' });
+});
+
+// ✅ Mettre à jour un appareil
+app.put('/api/admin/put-devices/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const {
+    name, type, location, etat,
+    consommation, Date_derniere_activite,
+    Date_debut_maintenance, Date_fin_maintenance
+  } = req.body;
+
+  await db.promise().query(`
+      UPDATE smart_devices SET 
+      name = ?, type = ?, location = ?, etat = ?, 
+      consommation = ?, Date_derniere_activite = ?, 
+      Date_debut_maintenance = ?, Date_fin_maintenance = ?
+      WHERE id = ?
+  `, [
+    name, type, location, etat,
+    consommation || null,
+    Date_derniere_activite || null,
+    Date_debut_maintenance || null,
+    Date_fin_maintenance || null,
+    id
+  ]);
+
+  res.json({ message: 'Appareil mis à jour' });
+});
+
+
+
 
 /* ************************* */
 /* DÉMARRAGE DU SERVEUR */

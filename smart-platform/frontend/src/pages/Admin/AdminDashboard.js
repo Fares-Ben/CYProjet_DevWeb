@@ -95,7 +95,7 @@ const AdminDashboard = () => {
         name: '',
         type: '',
         location: '',
-        status: 'actif',
+        etat: 'actif',
         attributes: {}
     });
     const [showToast, setShowToast] = useState(false);
@@ -348,18 +348,29 @@ const AdminDashboard = () => {
 
     const handleDeviceUpdate = async () => {
         try {
+            const token = localStorage.getItem('token');
+
             if (selectedDevice) {
-                await axios.put(`${API_BASE_URL}/admin/devices/${selectedDevice.id}`, deviceForm, {
-                    headers: { Authorization: localStorage.getItem('token') }
+                await axios.put(`${API_BASE_URL}/admin/put-devices/${selectedDevice.id}`, deviceForm, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
                 });
             } else {
-                await axios.post(`${API_BASE_URL}/admin/devices`, deviceForm, {
-                    headers: { Authorization: localStorage.getItem('token') }
+                await axios.post(`${API_BASE_URL}/admin/post-devices`, deviceForm, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
                 });
             }
 
-            const res = await axios.get(`${API_BASE_URL}/admin/devices`, {
-                headers: { Authorization: localStorage.getItem('token') }
+            const res = await axios.get(`${API_BASE_URL}/admin/get-devices`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
             });
 
             setDashboardData(prev => ({
@@ -367,7 +378,7 @@ const AdminDashboard = () => {
                 devices: res.data,
                 stats: {
                     ...prev.stats,
-                    activeDevices: res.data.filter(d => d.status === 'actif').length
+                    activeDevices: res.data.filter(d => d.etat === 'actif').length
                 }
             }));
 
@@ -396,7 +407,7 @@ const AdminDashboard = () => {
                     devices: res.data,
                     stats: {
                         ...prev.stats,
-                        activeDevices: res.data.filter(d => d.status === 'actif').length
+                        activeDevices: res.data.filter(d => d.etat === 'actif').length
                     }
                 }));
 
@@ -432,8 +443,8 @@ const AdminDashboard = () => {
             name: device.name,
             type: device.type,
             location: device.location,
-            status: device.status,
-            attributes: device.attributes || {}
+            etat: device.etat,
+            consommation: device.consommation
         });
         setShowDeviceModal(true);
     };
@@ -444,7 +455,7 @@ const AdminDashboard = () => {
             name: '',
             type: '',
             location: '',
-            status: 'actif',
+            etat: 'actif',
             attributes: {}
         });
         setShowDeviceModal(true);
@@ -457,15 +468,6 @@ const AdminDashboard = () => {
         });
     };
 
-    const handleAttributeChange = (e) => {
-        setDeviceForm({
-            ...deviceForm,
-            attributes: {
-                ...deviceForm.attributes,
-                [e.target.name]: e.target.value
-            }
-        });
-    };
 
     // Filtrage des utilisateurs
     const filteredUsers = dashboardData.users.filter(user =>
@@ -733,10 +735,10 @@ const AdminDashboard = () => {
                                                             <td>{device.type}</td>
                                                             <td>
                                                                 <Badge bg={
-                                                                    device.status === 'actif' ? 'success' :
-                                                                        device.status === 'maintenance' ? 'warning' : 'secondary'
+                                                                    device.etat === 'actif' ? 'success' :
+                                                                        device.etat === 'maintenance' ? 'warning' : 'secondary'
                                                                 }>
-                                                                    {device.status}
+                                                                    {device.etat}
                                                                 </Badge>
                                                             </td>
                                                         </tr>
@@ -982,10 +984,10 @@ const AdminDashboard = () => {
                                             <td>{device.location}</td>
                                             <td>
                                                 <Badge bg={
-                                                    device.status === 'actif' ? 'success' :
-                                                        device.status === 'maintenance' ? 'warning' : 'secondary'
+                                                    device.etat === 'actif' ? 'success' :
+                                                        device.etat === 'maintenance' ? 'warning' : 'secondary'
                                                 }>
-                                                    {device.status}
+                                                    {device.etat}
                                                 </Badge>
                                             </td>
                                             <td>{device.lastActivity || 'N/A'}</td>
@@ -1368,6 +1370,9 @@ const AdminDashboard = () => {
                                         <option value="climatisation">Climatisation</option>
                                         <option value="securite">Système de sécurité</option>
                                         <option value="eclairage">Éclairage intelligent</option>
+                                        <option value="capteur">Capteur</option>
+                                        <option value="Alarme">Alarme - Détecteur de fumée</option>
+                                        <option value="capteur">Capteur</option>
                                         <option value="autre">Autre</option>
                                     </Form.Select>
                                 </Form.Group>
@@ -1389,10 +1394,10 @@ const AdminDashboard = () => {
                             </Col>
                             <Col md={6}>
                                 <Form.Group className="mb-3">
-                                    <Form.Label>Statut</Form.Label>
+                                    <Form.Label>Etat</Form.Label>
                                     <Form.Select
-                                        name="status"
-                                        value={deviceForm.status}
+                                        name="etat"
+                                        value={deviceForm.etat}
                                         onChange={handleFormChange}
                                     >
                                         <option value="actif">Actif</option>
@@ -1403,43 +1408,17 @@ const AdminDashboard = () => {
                             </Col>
                         </Row>
 
-                        {/* Attributs dynamiques */}
-                        <Card className="mb-3">
-                            <Card.Header>Attributs spécifiques</Card.Header>
-                            <Card.Body>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Connectivité</Form.Label>
-                                    <Form.Control
-                                        type="text"
-                                        name="connectivity"
-                                        value={deviceForm.attributes.connectivity || ''}
-                                        onChange={handleAttributeChange}
-                                        placeholder="Wi-Fi, Bluetooth..."
-                                    />
-                                </Form.Group>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Niveau de batterie</Form.Label>
-                                    <Form.Control
-                                        type="number"
-                                        name="batteryLevel"
-                                        value={deviceForm.attributes.batteryLevel || ''}
-                                        onChange={handleAttributeChange}
-                                        placeholder="Pourcentage de batterie"
-                                        min="0"
-                                        max="100"
-                                    />
-                                </Form.Group>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Dernière maintenance</Form.Label>
-                                    <Form.Control
-                                        type="date"
-                                        name="lastMaintenance"
-                                        value={deviceForm.attributes.lastMaintenance || ''}
-                                        onChange={handleAttributeChange}
-                                    />
-                                </Form.Group>
-                            </Card.Body>
-                        </Card>
+                        <Col md={6}>
+                            <Form.Group className="mb-3">
+                                <Form.Label>Points</Form.Label>
+                                <Form.Control
+                                    type="number"
+                                    value={deviceForm.consommation}
+                                    onChange={handleFormChange}
+                                />
+                            </Form.Group>
+                        </Col>
+
                     </Form>
                 </Modal.Body>
                 <Modal.Footer>
