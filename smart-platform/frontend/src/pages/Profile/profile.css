@@ -1,40 +1,204 @@
+/* Global styles */
 .profile-container {
-    padding: 2rem;
-    font-family: Arial, sans-serif;
-    background-color: #f5f5f5;
-    min-height: 100vh;
+  padding: 3rem 2rem;
+  font-family: 'Roboto', sans-serif; /* Utilisation d'une police moderne */
+  background-color: #f4f4f4;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.profile-container h1 {
+  text-align: center;
+  font-size: 2.5rem;
+  color: #333;
+  margin-bottom: 3rem;
+  font-weight: 600;
+}
+
+/* Card container */
+.profile-card {
+  background-color: #ffffff;
+  max-width: 550px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 2.5rem;
+  border-radius: 15px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.3s ease-in-out;
+}
+
+.profile-card:hover {
+  box-shadow: 0 15px 50px rgba(0, 0, 0, 0.15);
+}
+
+.profile-card p {
+  font-size: 1.1rem;
+  color: #555;
+  margin: 0.8rem 0;
+  line-height: 1.6;
+}
+
+.profile-card strong {
+  color: #007bff; /* Couleur bleue pour les titres */
+}
+
+/* Image Styling */
+.profile-card .img-fluid {
+  border-radius: 50%;
+  border: 4px solid #007bff;
+  transition: transform 0.3s ease, border-color 0.3s ease;
+}
+
+.profile-card .img-fluid:hover {
+  transform: scale(1.05); /* Zoom léger sur l'image */
+  border-color: #0056b3; /* Changer la bordure au survol */
+}
+
+/* Form for editing */
+.edit-profile-form {
+  margin-top: 2rem;
+}
+
+.edit-profile-form .form-label {
+  font-weight: 500;
+  color: #333;
+}
+
+.edit-profile-form input[type="text"],
+.edit-profile-form input[type="email"],
+.edit-profile-form input[type="file"] {
+  width: 100%;
+  padding: 0.8rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border 0.3s ease-in-out;
+}
+
+.edit-profile-form input[type="text"]:focus,
+.edit-profile-form input[type="email"]:focus,
+.edit-profile-form input[type="file"]:focus {
+  border-color: #007bff;
+  outline: none;
+}
+
+/* Button styles */
+.edit-button,
+.edit-profile-form button[type="submit"],
+.edit-profile-form button[type="button"] {
+  padding: 0.8rem 1.5rem;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.3s ease, transform 0.3s ease;
+}
+
+.edit-button:hover,
+.edit-profile-form button[type="submit"]:hover,
+.edit-profile-form button[type="button"]:hover {
+  background-color: #0056b3;
+  transform: translateY(-2px); /* Effet de levée */
+}
+
+/* Cancel button */
+.edit-profile-form button[type="button"] {
+  background-color: #6c757d;
+  margin-left: 1rem;
+}
+
+.edit-profile-form button[type="button"]:hover {
+  background-color: #5a6268;
+}
+
+/* Responsive Styles */
+@media (max-width: 768px) {
+  .profile-container {
+    padding: 2rem 1rem;
   }
-  
-  .profile-container h1 {
-    text-align: center;
-    margin-bottom: 2rem;
-  }
-  
+
   .profile-card {
-    background-color: white;
-    max-width: 500px;
-    margin: 0 auto;
     padding: 2rem;
-    border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    max-width: 100%;
   }
-  
+
+  .profile-container h1 {
+    font-size: 2rem;
+  }
+
   .profile-card p {
-    margin: 0.5rem 0;
+    font-size: 1rem;
   }
-  
-  .edit-button {
-    margin-top: 1rem;
-    padding: 0.6rem 1.2rem;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
+
+  .edit-button,
+  .edit-profile-form button[type="submit"],
+  .edit-profile-form button[type="button"] {
+    padding: 0.6rem 1rem;
   }
-  
-  .edit-button:hover {
-    background-color: #0056b3;
-  }
-  
+}
+/* Formulaire d'édition */
+.edit-profile-form {
+  background-color: #ffffff;
+  padding: 2rem;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.edit-profile-form h3 {
+  text-align: center;
+  font-size: 1.8rem;
+  margin-bottom: 1.5rem;
+}
+
+.edit-profile-form .form-group {
+  margin-bottom: 1.5rem;
+}
+
+.edit-profile-form label {
+  font-weight: 600;
+  color: #333;
+}
+
+.edit-profile-form input {
+  width: 100%;
+  padding: 0.8rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border 0.3s ease-in-out;
+}
+
+.edit-profile-form input:focus {
+  border-color: #007bff;
+  outline: none;
+}
+
+.edit-profile-form button {
+  padding: 0.8rem 1.5rem;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.3s ease;
+  margin-top: 1rem;
+}
+
+.edit-profile-form button:hover {
+  background-color: #0056b3;
+}
+
+.edit-profile-form button[type="button"] {
+  background-color: #6c757d;
+  margin-left: 1rem;
+}
+
+.edit-profile-form button[type="button"]:hover {
+  background-color: #5a6268;
+}

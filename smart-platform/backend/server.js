@@ -10,6 +10,7 @@ const port = 3001;
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(bodyParser.json());
 
 // Charger les variables d'environnement
 require('dotenv').config();
@@ -839,7 +840,51 @@ app.put('/api/admin/put-devices/:id', authenticateToken, async (req, res) => {
   res.json({ message: 'Appareil mis à jour' });
 });
 
+// Route PUT pour modifier les informations de l'utilisateur
+app.put('/api/profiles/:id', authenticateToken, (req, res) => {
+  const userId = parseInt(req.params.id); // Récupérer l'ID de l'utilisateur depuis l'URL
+  const { nom, email, pseudo } = req.body; // Récupérer les nouvelles données dans le corps de la requête
 
+  // Vérifier si l'utilisateur existe
+  db.query('SELECT * FROM users WHERE id = ?', [userId], (err, result) => {
+    if (err) {
+      return res.status(500).send('Erreur de base de données');
+    }
+
+    if (result.length === 0) {
+      return res.status(404).send('Utilisateur non trouvé');
+    }
+
+    const user = result[0];
+
+    // Vérifier si l'utilisateur connecté est celui qui essaie de modifier les données
+    if (user.id !== req.user.id) {
+      return res.status(403).send('Vous ne pouvez pas modifier les données d\'un autre utilisateur');
+    }
+
+    // Mettre à jour les informations de l'utilisateur
+    const updatedUser = {
+      nom: nom || user.nom,
+      email: email || user.email,
+      pseudo: pseudo || user.pseudo,
+    };
+
+    db.query(
+      'UPDATE users SET nom = ?, email = ?, pseudo = ? WHERE id = ?',
+      [updatedUser.nom, updatedUser.email, updatedUser.pseudo, userId],
+      (err, result) => {
+        if (err) {
+          return res.status(500).send('Erreur lors de la mise à jour des données');
+        }
+
+        res.json({
+          message: 'Informations mises à jour avec succès',
+          user: updatedUser,
+        });
+      }
+    );
+  });
+});
 
 
 /* ************************* */
