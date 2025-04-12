@@ -884,6 +884,65 @@ app.put('/api/admin/put-devices/:id', authenticateToken, async (req, res) => {
   res.json({ message: 'Appareil mis à jour' });
 });
 
+const { createObjectCsvWriter } = require('csv-writer');
+const path = require('path');
+const PDFDocument = require('pdfkit');
+
+app.get('/api/admin/generate-report', (req, res) => {
+  const format = req.query.format;
+  try {
+    if (format === 'pdf'){
+      
+    const doc = new PDFDocument();
+
+    res.setHeader('Content-Disposition', 'attachment; filename=rapport.pdf');
+    res.setHeader('Content-Type', 'application/pdf');
+
+    doc.pipe(res);
+
+    doc.fontSize(20).text('Rapport Administratif', { align: 'center' });
+    doc.moveDown();
+    doc.fontSize(14).text(`Rapport généré le ${new Date().toLocaleDateString('fr-FR')}`);
+    doc.moveDown();
+    doc.fontSize(12).text('Voici un aperçu global du système :');
+    doc.text('- 120 utilisateurs');
+    doc.text('- 10 classes');
+    doc.text('- 85 appareils actifs');
+    doc.text('- 920 kWh consommés ce mois-ci');
+
+    doc.end();
+  
+    } else {
+      const csvWriter = createObjectCsvWriter({
+        path: path.join(__dirname, 'rapport.csv'),
+        header: [
+            { id: 'name', title: 'Name' },
+            { id: 'age', title: 'Age' },
+            { id: 'city', title: 'City' }
+        ]
+    });
+
+    const records = [
+        { name: 'Alice', age: 25, city: 'Paris' },
+        { name: 'Bob', age: 30, city: 'Lyon' },
+        { name: 'Charlie', age: 35, city: 'Marseille' }
+    ];
+
+    csvWriter.writeRecords(records)
+        .then(() => {
+            res.setHeader('Content-Type', 'text/csv');
+            res.setHeader('Content-Disposition', 'attachment; filename="rapport.csv"');
+            res.sendFile(path.join(__dirname, 'rapport.csv')); 
+        })
+        .catch(err => {
+            res.status(500).send('Erreur lors de la génération du CSV');
+        });
+    }
+  } catch (err) {
+    console.error("Erreur génération PDF :", err);
+    res.status(500).json({ error: "Erreur lors de la génération du PDF" });
+  }
+});
 
 
 

@@ -429,15 +429,29 @@ const AdminDashboard = () => {
 
     const handleGenerateReport = async () => {
         try {
-            // Simulation de génération de rapport
-            setToastMessage(`Rapport ${reportType} généré en format ${exportFormat}`);
+            const response = await fetch(`${API_BASE_URL}/admin/generate-report?format=${exportFormat}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+    
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `rapport de consommation.${exportFormat}`
+            a.click();
+    
+            setToastMessage('Rapport PDF téléchargé avec succès');
             setShowToast(true);
             setShowReportModal(false);
         } catch (err) {
             console.error(err);
-            setError(err.message);
+            setError("Erreur lors de la génération du rapport");
         }
     };
+    
 
     const handleLogout = () => {
         localStorage.removeItem('token');
@@ -1480,28 +1494,7 @@ const AdminDashboard = () => {
                                     checked={exportFormat === 'pdf'}
                                     onChange={() => setExportFormat('pdf')}
                                 />
-                                <Form.Check
-                                    inline
-                                    label="Excel"
-                                    name="exportFormat"
-                                    type="radio"
-                                    id="excel-format"
-                                    checked={exportFormat === 'excel'}
-                                    onChange={() => setExportFormat('excel')}
-                                />
                             </div>
-                        </Form.Group>
-
-                        <Form.Group className="mb-3">
-                            <Form.Label>Période</Form.Label>
-                            <Row>
-                                <Col md={6}>
-                                    <Form.Control type="date" label="Date de début" />
-                                </Col>
-                                <Col md={6}>
-                                    <Form.Control type="date" label="Date de fin" />
-                                </Col>
-                            </Row>
                         </Form.Group>
                     </Form>
                 </Modal.Body>
