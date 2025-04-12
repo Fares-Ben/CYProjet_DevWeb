@@ -35,6 +35,8 @@ CREATE TABLE smart_devices (
   etat VARCHAR(20) NOT NULL,
   consommation INT,
   Date_derniere_activite DATE
+  Date_debut_maintenance DATE
+  Date_fin_maintenance DATE
 );
 
 -- Table users_activity

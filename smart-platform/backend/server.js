@@ -741,6 +741,67 @@ app.get('/api/admin/class-students/:classId', authenticateToken, isAdmin, (req, 
   });
 });
 
+
+
+// ✅ Récupérer tous les appareils
+app.get('/api/admin/get-devices', authenticateToken, async (req, res) => {
+  const [rows] = await db.promise().query('SELECT * FROM smart_devices');
+  res.json(rows);
+});
+
+// ✅ Créer un appareil
+app.post('/api/admin/post-devices', authenticateToken, async (req, res) => {
+  const {
+    name, type, location, etat,
+    consommation, Date_derniere_activite,
+    Date_debut_maintenance, Date_fin_maintenance
+  } = req.body;
+
+  await db.promise().query(`
+      INSERT INTO smart_devices 
+      (name, type, location, etat, consommation, Date_derniere_activite, Date_debut_maintenance, Date_fin_maintenance)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `, [
+    name, type, location, etat,
+    consommation || null,
+    Date_derniere_activite || null,
+    Date_debut_maintenance || null,
+    Date_fin_maintenance || null
+  ]);
+
+  res.status(201).json({ message: 'Appareil créé' });
+});
+
+// ✅ Mettre à jour un appareil
+app.put('/api/admin/put-devices/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const {
+    name, type, location, etat,
+    consommation, Date_derniere_activite,
+    Date_debut_maintenance, Date_fin_maintenance
+  } = req.body;
+
+  await db.promise().query(`
+      UPDATE smart_devices SET 
+      name = ?, type = ?, location = ?, etat = ?, 
+      consommation = ?, Date_derniere_activite = ?, 
+      Date_debut_maintenance = ?, Date_fin_maintenance = ?
+      WHERE id = ?
+  `, [
+    name, type, location, etat,
+    consommation || null,
+    Date_derniere_activite || null,
+    Date_debut_maintenance || null,
+    Date_fin_maintenance || null,
+    id
+  ]);
+
+  res.json({ message: 'Appareil mis à jour' });
+});
+
+
+
+
 /* ************************* */
 /* DÉMARRAGE DU SERVEUR */
 /* ************************* */
