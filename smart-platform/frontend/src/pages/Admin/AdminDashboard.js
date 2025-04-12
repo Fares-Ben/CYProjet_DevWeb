@@ -96,7 +96,7 @@ const AdminDashboard = () => {
         type: '',
         location: '',
         etat: 'actif',
-        attributes: {}
+        consommation: 0,
     });
     const [showToast, setShowToast] = useState(false);
     const [toastMessage, setToastMessage] = useState('');
@@ -456,7 +456,7 @@ const AdminDashboard = () => {
             type: '',
             location: '',
             etat: 'actif',
-            attributes: {}
+            consommation: 0,
         });
         setShowDeviceModal(true);
     };
@@ -614,7 +614,7 @@ const AdminDashboard = () => {
                                             <FaUsers />
                                         </div>
                                         <Card.Title>Utilisateurs</Card.Title>
-                                        <div className="stat-value">{dashboardData.stats.totalUsers}</div>
+                                        <div className="stat-value">{dashboardData.users.length}</div>
                                         <div className="stat-change">
                                             <span className="text-success">+5%</span> ce mois-ci
                                         </div>
@@ -967,7 +967,7 @@ const AdminDashboard = () => {
                                         <th>Type</th>
                                         <th>Localisation</th>
                                         <th>Statut</th>
-                                        <th>Dernière activité</th>
+                                        <th>Consommation (en Kw/h)</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
@@ -1410,9 +1410,10 @@ const AdminDashboard = () => {
 
                         <Col md={6}>
                             <Form.Group className="mb-3">
-                                <Form.Label>Points</Form.Label>
+                                <Form.Label>consommation (en kw/h)</Form.Label>
                                 <Form.Control
                                     type="number"
+                                    name="consommation"
                                     value={deviceForm.consommation}
                                     onChange={handleFormChange}
                                 />
