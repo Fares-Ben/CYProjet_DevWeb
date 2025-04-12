@@ -392,31 +392,38 @@ const AdminDashboard = () => {
     };
 
     const handleDeviceDelete = async (deviceId) => {
-        if (window.confirm('Êtes-vous sûr de vouloir supprimer cet appareil ?')) {
-            try {
-                await axios.delete(`${API_BASE_URL}/admin/devices/${deviceId}`, {
-                    headers: { Authorization: localStorage.getItem('token') }
-                });
 
-                const res = await axios.get(`${API_BASE_URL}/admin/devices`, {
-                    headers: { Authorization: localStorage.getItem('token') }
-                });
+        const token = localStorage.getItem('token');
 
-                setDashboardData(prev => ({
-                    ...prev,
-                    devices: res.data,
-                    stats: {
-                        ...prev.stats,
-                        activeDevices: res.data.filter(d => d.etat === 'actif').length
-                    }
-                }));
+        try {
 
-                setToastMessage('Appareil supprimé avec succès');
-                setShowToast(true);
-            } catch (err) {
-                console.error(err);
-                setError(err.message);
-            }
+            await axios.delete(`${API_BASE_URL}/admin/delete-devices/${deviceId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            const res = await axios.get(`${API_BASE_URL}/admin/devices`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            setDashboardData(prev => ({
+                ...prev,
+                devices: res.data,
+                stats: {
+                    ...prev.stats,
+                    activeDevices: res.data.filter(d => d.etat === 'actif').length
+                }
+            }));
+
+            setToastMessage('Appareil supprimé avec succès');
+            setShowToast(true);
+        } catch (err) {
+            console.error(err);
+            setError(err.message);
         }
     };
 
@@ -614,7 +621,7 @@ const AdminDashboard = () => {
                                             <FaUsers />
                                         </div>
                                         <Card.Title>Utilisateurs</Card.Title>
-                                        <div className="stat-value">{dashboardData.stats.totalUsers}</div>
+                                        <div className="stat-value">{dashboardData.users.length}</div>
                                         <div className="stat-change">
                                             <span className="text-success">+5%</span> ce mois-ci
                                         </div>

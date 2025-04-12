@@ -705,7 +705,11 @@ app.get('/api/validate-account', async (req, res) => {
 
 
     if (new Date(user.token_expiration) < now) {
+
+      // Supprimer le compte expiré
+      await db.promise().query('DELETE FROM users WHERE id = ?', [user.id]);
       return res.status(400).json({ error: 'Le token a expiré. Veuillez vous réinscrire.' });
+
     }
 
 
@@ -809,6 +813,36 @@ app.post('/api/admin/post-devices', authenticateToken, async (req, res) => {
     Date_fin_maintenance || null
   ]);
 
+
+  // ✅ Supprimer un appareil
+  app.delete('/api/admin/delete-devices/:deviceId', authenticateToken, async (req, res) => {
+    try {
+      const deviceId = req.params.deviceId;
+
+      // Vérification que l'appareil existe
+      const [device] = await db.promise().query(
+        'SELECT id FROM smart_devices WHERE id = ?',
+        [deviceId]
+      );
+
+      if (device.length === 0) {
+        return res.status(404).json({ error: 'Appareil non trouvé' });
+      }
+
+      // Suppression de l'appareil
+      await db.promise().query(
+        'DELETE FROM smart_devices WHERE id = ?',
+        [deviceId]
+      );
+
+      res.status(200).json({ message: 'Appareil supprimé avec succès' });
+
+    } catch (error) {
+      console.error('Erreur lors de la suppression:', error);
+      res.status(500).json({ error: 'Erreur interne du serveur' });
+    }
+  });
+
   res.status(201).json({ message: 'Appareil créé' });
 });
 
@@ -829,7 +863,7 @@ app.put('/api/admin/put-devices/:id', authenticateToken, async (req, res) => {
       WHERE id = ?
   `, [
     name, type, location, etat,
-    consommation || null,
+    consommation,
     Date_derniere_activite || null,
     Date_debut_maintenance || null,
     Date_fin_maintenance || null,
