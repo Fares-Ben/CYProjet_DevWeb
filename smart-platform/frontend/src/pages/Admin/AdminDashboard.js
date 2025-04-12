@@ -59,7 +59,7 @@ const AdminDashboard = () => {
     const { userLevel } = location.state || {};
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [userToDelete, setUserToDelete] = useState(null);
-
+    const [deviceSearchTerm, setDeviceSearchTerm] = useState('');
 
     // États pour les données
     const [dashboardData, setDashboardData] = useState({
@@ -91,18 +91,13 @@ const AdminDashboard = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [deviceForm, setDeviceForm] = useState({
-        name: '',
-        type: '',
-        location: '',
-        status: 'actif',
-        attributes: {}
-    });
+    const [deviceForm, setDeviceForm] = useState({name: '',type: '',location: '',status: 'actif',attributes: {}});
     const [showToast, setShowToast] = useState(false);
     const [toastMessage, setToastMessage] = useState('');
     const [reportType, setReportType] = useState('usage');
     const [exportFormat, setExportFormat] = useState('csv');
-
+    const [filters, setFilters] = useState({type: '',status: '',location: ''});
+    
     function isUserValidated(selectedUser) {
         return selectedUser.Validated === 1;
     }
@@ -473,6 +468,25 @@ const AdminDashboard = () => {
         user.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user.prenom.toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    const filteredDevices = dashboardData.devices.filter(device => {
+        if (!device) return false;
+        
+        // Filtre de recherche textuelle
+        const searchLower = deviceSearchTerm.toLowerCase();
+        const textMatch = 
+            (device.name?.toLowerCase() || '').includes(searchLower) ||
+            (device.type?.toLowerCase() || '').includes(searchLower) ||
+            (device.location?.toLowerCase() || '').includes(searchLower) ||
+            (device.status?.toLowerCase() || '').includes(searchLower);
+        
+        // Filtres supplémentaires
+        const typeMatch = !filters.type || device.type === filters.type;
+        const statusMatch = !filters.status || device.status === filters.status;
+        const locationMatch = !filters.location || device.location === filters.location;
+        
+        return textMatch && typeMatch && statusMatch && locationMatch;
+    });
 
     if (isLoading) {
         return (
@@ -957,6 +971,86 @@ const AdminDashboard = () => {
                                 </Col>
                             </Row>
 
+                            {/* barre de recherche */}
+                            <Card className="mb-4">
+                                <Card.Body>
+                                    <Form.Group>
+                                        <Form.Label>
+                                            <FaSearch className="me-2" />
+                                            Rechercher un appareil
+                                        </Form.Label>
+                                        <Form.Control
+                                            type="text"
+                                            placeholder="Rechercher par nom, type, localisation ou statut..."
+                                            value={deviceSearchTerm}
+                                            onChange={(e) => setDeviceSearchTerm(e.target.value)}
+                                        />
+                                    </Form.Group>
+                                </Card.Body>
+                            </Card>
+
+                            {/* Barre de filtres */}
+                            <Card className="mb-4 filter-card">
+                                <Card.Body>
+                                    <Row>
+                                        <Col md={4}>
+                                            <Form.Group>
+                                                <Form.Label>Type d'appareil</Form.Label>
+                                                <Form.Select
+                                                    value={filters.type}
+                                                    onChange={(e) => setFilters({...filters, type: e.target.value})}
+                                                >
+                                                    <option value="">Tous les types</option>
+                                                    <option value="tableau">Tableau interactif</option>
+                                                    <option value="climatisation">Climatisation</option>
+                                                    <option value="securite">Sécurité</option>
+                                                    <option value="imprimante">Imprimante</option>
+                                                </Form.Select>
+                                            </Form.Group>
+                                        </Col>
+                                        <Col md={4}>
+                                            <Form.Group>
+                                                <Form.Label>Statut</Form.Label>
+                                                <Form.Select
+                                                    value={filters.status}
+                                                    onChange={(e) => setFilters({...filters, status: e.target.value})}
+                                                >
+                                                    <option value="">Tous les statuts</option>
+                                                    <option value="actif">Actif</option>
+                                                    <option value="maintenance">Maintenance</option>
+                                                    <option value="inactif">Inactif</option>
+                                                </Form.Select>
+                                            </Form.Group>
+                                        </Col>
+                                        <Col md={4}>
+                                            <Form.Group>
+                                                <Form.Label>Localisation</Form.Label>
+                                                <Form.Select
+                                                    value={filters.location}
+                                                    onChange={(e) => setFilters({...filters, location: e.target.value})}
+                                                >
+                                                    <option value="">Toutes les localisations</option>
+                                                    {[...new Set(dashboardData.devices.map(d => d.location))].map(loc => (
+                                                        <option key={loc} value={loc}>{loc}</option>
+                                                    ))}
+                                                </Form.Select>
+                                            </Form.Group>
+                                        </Col>
+                                    </Row>
+                                    {Object.values(filters).some(Boolean) && (
+                                        <div className="mt-3 text-end">
+                                            <Button 
+                                                variant="outline-secondary"
+                                                size="sm"
+                                                onClick={() => setFilters({ type: '', status: '', location: '' })}
+                                            >
+                                                Réinitialiser
+                                            </Button>
+                                        </div>
+                                    )}
+                                </Card.Body>
+                            </Card>
+
                             <Table striped bordered hover responsive>
                                 <thead>
                                     <tr>
@@ -970,7 +1064,7 @@ const AdminDashboard = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {dashboardData.devices.map(device => (
+                                    {filteredDevices.map(device => (
                                         <tr key={device.id}>
                                             <td>{device.id}</td>
                                             <td>{device.name}</td>

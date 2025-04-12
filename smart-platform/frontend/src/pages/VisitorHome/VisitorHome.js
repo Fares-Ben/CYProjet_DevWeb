@@ -55,8 +55,9 @@ const VisitorHome = () => {
     const [userLevel, setUserLevel] = useState('visitor');
     const [showEditModal, setShowEditModal] = useState(false);
     const [currentDevice, setCurrentDevice] = useState(null);
+    const [searchTerm, setSearchTerm] = useState('');
     const [deviceForm, setDeviceForm] = useState({});
-
+    
 
     // Ajoutez ceci dans la fonction verifyToken
     const verifyToken = async (token) => {
@@ -217,7 +218,12 @@ const VisitorHome = () => {
     // Filtrage des appareils
     const filteredDevices = schoolData.smartDevices.filter(device =>
         (filters.deviceType ? device.type === filters.deviceType : true) &&
-        (filters.location ? device.location === filters.location : true)
+        (filters.location ? device.location === filters.location : true) &&
+        (searchTerm ? 
+            device.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+            device.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            device.type.toLowerCase().includes(searchTerm.toLowerCase())
+            : true)
     );
 
     return (
@@ -400,6 +406,24 @@ const VisitorHome = () => {
                             </Button>
                         )}
                     </div>
+                    
+                    {/* BARRE DE RECHERCHE */}
+                    <Card className="mb-4 search-card">
+                        <Card.Body>
+                            <Form.Group>
+                                <Form.Label>
+                                    <FaSearch className="me-2" />
+                                    Rechercher un appareil
+                                </Form.Label>
+                                <Form.Control
+                                    type="text"
+                                    placeholder="Nom, type ou localisation..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </Form.Group>
+                        </Card.Body>
+                    </Card>
 
                     {/* Filtres */}
                     <Card className="mb-4 filter-card">
