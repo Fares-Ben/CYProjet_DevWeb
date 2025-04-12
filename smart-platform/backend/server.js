@@ -801,17 +801,28 @@ app.post('/api/admin/post-devices', authenticateToken, async (req, res) => {
     Date_debut_maintenance, Date_fin_maintenance
   } = req.body;
 
-  await db.promise().query(`
+  const [result] = await db.promise().query(`
       INSERT INTO smart_devices 
       (name, type, location, etat, consommation, Date_derniere_activite, Date_debut_maintenance, Date_fin_maintenance)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     name, type, location, etat,
-    consommation || null,
+    consommation,
     Date_derniere_activite || null,
     Date_debut_maintenance || null,
     Date_fin_maintenance || null
   ]);
+  const newDeviceId = result.insertId;
+
+
+  // 3. Enregistrement dans l'historique
+  await db.promise().query(
+    `INSERT INTO objects_activity 
+          (ID_user_changeur, ID_object_modified, type, ancienne_donnee, nouvelle_donnee, date) 
+          VALUES (?, ?, 'AJOUT NOUVEAU APPAREIL', '0', 'nouveau appreil', NOW())`,
+    [req.user.id, newDeviceId]
+  );
+
 
 
   // ✅ Supprimer un appareil
