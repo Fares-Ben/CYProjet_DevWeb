@@ -6,10 +6,12 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const app = express();
 const port = 3001;
+const profileRouter = require('./routes/profile');
 
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use('/api/profile', profileRouter);
 
 // Charger les variables d'environnement
 require('dotenv').config();

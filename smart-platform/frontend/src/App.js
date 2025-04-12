@@ -5,7 +5,7 @@ import VisitorHome from './pages/VisitorHome/VisitorHome';
 import RegisterPage from './pages/Register/RegisterPage'
 import LoginPage from './pages/Login/LoginPage'
 import AdminDashboard from './pages/Admin/AdminDashboard'
-import Profile from './pages/Profile/Profile'
+import Profile from './pages/Profile/profile'
 import ValidateAccountPage from './pages/Validation/ValidateAccountPage'
 
 
