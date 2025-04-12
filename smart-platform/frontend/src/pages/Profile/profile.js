@@ -12,17 +12,15 @@ const Profile = () => {
     if (token) {
       const fetchUserInfo = async () => {
         try {
-          const response = await fetch('http://localhost:3001/api/profile', {  // Utiliser le bon port pour le backend
-            
+          const response = await fetch('http://localhost:3001/api/profiles', {
             method: 'GET',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`,  // Envoi du token dans l'en-tête
+              'Authorization': `Bearer ${token}`,
             },
           });
+
           console.log('Status de la réponse :', response.status);
-          const text = await response.text();
-          console.log('Réponse brute :', text);
 
           if (!response.ok) {
             if (response.status === 401) {
@@ -31,19 +29,17 @@ const Profile = () => {
             throw new Error('Erreur lors de la récupération des données.');
           }
 
-          const data = await response.json();
-          setUserInfo(data);  // Mise à jour de l'état avec les données utilisateur
+          const data = await response.json(); // Parse directement en JSON
+          console.log('Réponse JSON :', data);
+          setUserInfo(data);
         } catch (err) {
-          setError(err.message);  // Gestion des erreurs
+          setError(err.message);
         } finally {
-          setLoading(false);  // Fin du chargement
+          setLoading(false);
         }
       };
 
       fetchUserInfo();
-    } else {
-      setError('Aucun token trouvé. Vous devez être connecté pour accéder à cette page.');
-      setLoading(false);
     }
   }, [token]);
 

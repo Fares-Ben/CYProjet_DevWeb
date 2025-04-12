@@ -6,7 +6,6 @@ const { Classe, Announcement, Event, SmartDevice } = require('../models'); // Si
 exports.getSchoolData = async (req, res) => {
     try {
         // Récupérer les données des différents modèles
-        const classes = await Classe.findAll();
         const announcements = await Announcement.findAll();
         const events = await Event.findAll();
         const smartDevices = await SmartDevice.findAll();

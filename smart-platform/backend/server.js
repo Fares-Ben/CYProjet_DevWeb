@@ -6,12 +6,10 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const app = express();
 const port = 3001;
-const profileRouter = require('./routes/profile');
 
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use('/api/profile', profileRouter);
 
 // Charger les variables d'environnement
 require('dotenv').config();
@@ -184,6 +182,7 @@ app.get('/api/smart-devices', (req, res) => {
     res.json(results);
   });
 });
+
 
 /* ************************* */
 /* ROUTES D'AUTHENTIFICATION */
@@ -742,7 +741,46 @@ app.get('/api/admin/class-students/:classId', authenticateToken, isAdmin, (req, 
     res.json(results);
   });
 });
+app.get('/api/profiles', authenticateToken, (req, res) => {
+  const userId = req.user.id;
+  console.log('Tentative de récupération du profil pour user ID:', userId);
+  db.query(`
+    SELECT 
+      u.id, 
+      u.pseudo, 
+      u.nom, 
+      u.prenom, 
+      u.date_naissance, 
+      u.email, 
+      u.fonction, 
+      u.niveau, 
+      u.points, 
+      u.date_inscription, 
+      u.last_connexion,
+      u.nb_connexions,
+      u.nb_actions,
+      u.theme_prefere
+    FROM users u
+    WHERE u.id = ?
+  `, [userId], (err, results) => {
+    if (err) {
+      console.error('Erreur SQL:', err);
+      return res.status(500).json({
+        message: 'Erreur serveur',
+        error: err.message // Envoyer seulement le message d'erreur
+      });
+    }
 
+    if (results.length === 0) {
+      console.log('Aucun utilisateur trouvé pour ID:', userId);
+      return res.status(404).json({ message: 'Utilisateur non trouvé' });
+    }
+
+    const user = results[0];
+    console.log('Profil trouvé:', user);
+    res.json(user);
+  });
+});
 
 
 // ✅ Récupérer tous les appareils
