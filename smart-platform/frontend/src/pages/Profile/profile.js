@@ -62,7 +62,7 @@ const Profile = () => {
         <div>
           <div className="row">
             <div className="col-md-4">
-              {userInfo.photo && <img src={userInfo.photo} alt="Photo de profil" className="img-fluid rounded-circle" />}
+              {userInfo.photo && <img src={userInfo.photo} alt={userInfo.pseudo || "Utilisateur"} className="img-fluid rounded-circle" />}
             </div>
             <div className="col-md-8">
               <p><strong>Nom :</strong> {userInfo.nom}</p>

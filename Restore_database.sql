@@ -40,7 +40,7 @@ CREATE TABLE smart_devices (
 );
 
 -- Table users_activity
-CREATE TABLE users_activity (
+CREATE TABLE Users_activity (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   ID_user_changeur INT NOT NULL,
   ID_user_modified INT NOT NULL,
