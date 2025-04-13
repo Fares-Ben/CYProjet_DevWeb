@@ -865,7 +865,7 @@ app.post('/api/admin/post-devices', authenticateToken, async (req, res) => {
 });
 
 // ✅ Mettre à jour un appareil
-app.put('/api/admin/put-devices/:id', authenticateToken, async (req, res) => {
+app.put('/api/admin/devices/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
   const {
     name, type, location, etat,
@@ -890,6 +890,140 @@ app.put('/api/admin/put-devices/:id', authenticateToken, async (req, res) => {
 
   res.json({ message: 'Appareil mis à jour' });
 });
+
+// ✅ Créer un utilisateur (par un admin)
+app.post('/api/admin/add-user', authenticateToken, async (req, res) => {
+  const {
+    nom,
+    prenom,
+    email,
+    password,
+    fonction,
+    niveau,
+    date_naissance
+  } = req.body;
+
+  if (!nom || !prenom || !email || !password || !fonction || !niveau || !date_naissance) {
+    return res.status(400).json({ error: 'Tous les champs sont requis' });
+  }
+
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    // Vérifie si l’email existe déjà
+    const [existingUsers] = await connection.query(
+      'SELECT id FROM users WHERE email = ?',
+      [email]
+    );
+
+    if (existingUsers.length > 0) {
+      return res.status(409).json({ error: 'Email déjà utilisé' });
+    }
+
+    // Génération automatique du pseudo
+    const prenomInitiale = prenom.trim().toLowerCase().charAt(0);
+    const nomSanitized = nom.trim().toLowerCase().replace(/\s/g, '');
+    let basePseudo = fonction.toLowerCase() === 'eleve'
+      ? `e-${prenomInitiale}${nomSanitized}`
+      : fonction.toLowerCase() === 'personnel'
+        ? `pers-${prenomInitiale}${nomSanitized}`
+        : `prof-${prenomInitiale}${nomSanitized}`;
+
+    const [similarPseudos] = await connection.query(
+      'SELECT pseudo FROM users WHERE pseudo LIKE ?',
+      [`${basePseudo}%`]
+    );
+
+    let finalPseudo = basePseudo;
+    if (similarPseudos.length > 0) {
+      const nextNumber = similarPseudos.length + 1;
+      finalPseudo = `${basePseudo}${nextNumber}`;
+    }
+
+    // Hachage du mot de passe
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Création directe : validé et email confirmé
+    const [result] = await connection.query(
+      `INSERT INTO users 
+        (nom, prenom, date_naissance, fonction, email, password, pseudo, niveau, 
+         points, validated, email_verified)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 1, 1)`,
+      [
+        nom,
+        prenom,
+        formatDateForDB(date_naissance),
+        fonction,
+        email,
+        hashedPassword,
+        finalPseudo,
+        niveau
+      ]
+    );
+
+    await connection.commit();
+
+    res.status(201).json({
+      message: 'Utilisateur créé avec succès',
+      userId: result.insertId,
+      pseudo: finalPseudo
+    });
+  } catch (err) {
+    await connection.rollback();
+    console.error('Erreur add-user admin :', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  } finally {
+    connection.release();
+  }
+});
+
+// ✅ Créer un événement
+app.post('/api/admin/events', authenticateToken, async (req, res) => {
+  const {
+    title,
+    description,
+    location,
+    date,
+    startTime,
+    endTime,
+    participants
+  } = req.body;
+
+  if (!title || !location || !date || !startTime || !endTime) {
+    return res.status(400).json({ error: 'Tous les champs obligatoires ne sont pas remplis' });
+  }
+
+  const connection = await pool.getConnection();
+
+  try {
+    const [result] = await connection.query(
+      `INSERT INTO events 
+        (title, description, location, date, start_time, end_time, participants, created_by) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        title,
+        description,
+        location,
+        date,
+        startTime,
+        endTime,
+        participants || 'Tous',
+        req.user.id // L’admin qui a créé l’événement
+      ]
+    );
+
+    res.status(201).json({
+      message: 'Événement créé avec succès',
+      eventId: result.insertId
+    });
+  } catch (err) {
+    console.error('Erreur lors de la création de l’événement :', err);
+    res.status(500).json({ error: 'Erreur serveur lors de la création de l’événement' });
+  }
+});
+
 
 // Route PUT pour modifier les informations de l'utilisateur
 app.put('/api/profiles/:id', authenticateToken, (req, res) => {

@@ -847,7 +847,7 @@ const AdminDashboard = () => {
                         <div className="users-content">
                             <div className="d-flex justify-content-between align-items-center mb-4">
                                 <h2 className="admin-title">Gestion des utilisateurs</h2>
-                                <Button variant="primary" onClick={() => navigate('/admin/add-user')}>
+                                <Button variant="primary" onClick={() => navigate('/admindashboard/addUser')}>
                                     <FaPlus className="me-2" />
                                     Ajouter un utilisateur
                                 </Button>
@@ -1447,7 +1447,7 @@ const AdminDashboard = () => {
                         <div className="classes-content">
                             <div className="d-flex justify-content-between align-items-center mb-4">
                                 <h2 className="admin-title">Gestion des classes</h2>
-                                <Button variant="primary" onClick={() => navigate('/admin/add-class')}>
+                                <Button variant="primary" onClick={() => navigate('/admin/addClass')}>
                                     <FaPlus className="me-2" />
                                     Ajouter une classe
                                 </Button>
@@ -1495,7 +1495,7 @@ const AdminDashboard = () => {
                         <div className="announcements-content">
                             <div className="d-flex justify-content-between align-items-center mb-4">
                                 <h2 className="admin-title">Gestion des annonces</h2>
-                                <Button variant="primary" onClick={() => navigate('/admin/add-announcement')}>
+                                <Button variant="primary" onClick={() => navigate('/admindashboard/addAnnouncement')}>
                                     <FaPlus className="me-2" />
                                     Créer une annonce
                                 </Button>
@@ -1544,7 +1544,7 @@ const AdminDashboard = () => {
                         <div className="events-content">
                             <div className="d-flex justify-content-between align-items-center mb-4">
                                 <h2 className="admin-title">Gestion des événements</h2>
-                                <Button variant="primary" onClick={() => navigate('/admin/add-event')}>
+                                <Button variant="primary" onClick={() => navigate('/admindashboard/addEvent')}>
                                     <FaPlus className="me-2" />
                                     Ajouter un événement
                                 </Button>

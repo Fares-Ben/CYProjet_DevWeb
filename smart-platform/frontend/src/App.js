@@ -7,6 +7,9 @@ import LoginPage from './pages/Login/LoginPage'
 import AdminDashboard from './pages/Admin/AdminDashboard'
 import Profile from './pages/Profile/profile'
 import ValidateAccountPage from './pages/Validation/ValidateAccountPage'
+import AddEvent from './pages/Add/addEvent'
+import AddAnnouncement from './pages/Add/addAnnouncement'
+import AddUser from './pages/Add/addUser'
 
 
 function App() {
@@ -22,6 +25,9 @@ function App() {
         <Route path="/validate-account/:token" element={<ValidateAccountPage />} />
         <Route path="/validate-account" element={<ValidateAccountPage />} />
         <Route path="/admindashboard" element={<AdminDashboard />} />
+        <Route path="/admindashboard/addEvent" element={<AddEvent />} />
+        <Route path="/admindashboard/addAnnouncement" element={<AddAnnouncement />} />
+        <Route path="/admindashboard/addUser" element={<AddUser />} />
         <Route path="/profile" element={<Profile />} />
       </Routes>
     </Router>
