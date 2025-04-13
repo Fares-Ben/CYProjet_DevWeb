@@ -514,6 +514,43 @@ const AdminDashboard = () => {
         }
     };
 
+    const handleGenerateReport = async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/admin/generate-report?format=${exportFormat}&type=${reportType}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            if (reportType === 'energy') {
+                a.download = `rapport_sur_consommation.${exportFormat}`;
+            } else if (reportType === 'usage') {
+                a.download = `rapport_sur_utilisation.${exportFormat}`;
+            } else {
+                a.download = `rapport_sur_utilisateurs.${exportFormat}`;
+            }
+            a.click();
+
+            setToastMessage('Rapport PDF téléchargé avec succès');
+            setShowToast(true);
+            setShowReportModal(false);
+        } catch (err) {
+            console.error(err);
+            setError("Erreur lors de la génération du rapport");
+        }
+    };
+
+
+    const handleLogout = () => {
+        localStorage.removeItem('token');
+        navigate('/');
+    };
+
     const handleDeviceEdit = (device) => {
         setSelectedDevice(device);
         setDeviceForm({
@@ -554,37 +591,6 @@ const AdminDashboard = () => {
         handleDeviceUpdate();
     };
 
-    // Gestion des rapports
-    const handleGenerateReport = async () => {
-        try {
-            const token = localStorage.getItem('token');
-            const response = await axios.post(
-                `${API_BASE_URL}/admin/generate-report`,
-                { reportType, exportFormat },
-                { headers: { 'Authorization': `Bearer ${token}` }, responseType: 'blob' }
-            );
-
-            const url = window.URL.createObjectURL(new Blob([response.data]));
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `rapport_${reportType}.${exportFormat}`);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-
-            showNotification('Rapport généré avec succès');
-            setShowReportModal(false);
-        } catch (err) {
-            console.error('Error generating report:', err);
-            showNotification(err.response?.data?.message || 'Erreur lors de la génération du rapport', 'danger');
-        }
-    };
-
-    // Autres handlers
-    const handleLogout = () => {
-        localStorage.removeItem('token');
-        navigate('/');
-    };
 
     // Filtrage des données
     const filteredUsers = (dashboardData?.users || []).filter(user =>
@@ -2061,7 +2067,6 @@ const AdminDashboard = () => {
                                 <option value="usage">Utilisation des appareils</option>
                                 <option value="energy">Consommation énergétique</option>
                                 <option value="users">Activité des utilisateurs</option>
-                                <option value="maintenance">Maintenance</option>
                             </Form.Select>
                         </Form.Group>
 
@@ -2086,28 +2091,7 @@ const AdminDashboard = () => {
                                     checked={exportFormat === 'pdf'}
                                     onChange={() => setExportFormat('pdf')}
                                 />
-                                <Form.Check
-                                    inline
-                                    label="Excel"
-                                    name="exportFormat"
-                                    type="radio"
-                                    id="excel-format"
-                                    checked={exportFormat === 'excel'}
-                                    onChange={() => setExportFormat('excel')}
-                                />
                             </div>
-                        </Form.Group>
-
-                        <Form.Group className="mb-3">
-                            <Form.Label>Période</Form.Label>
-                            <Row>
-                                <Col md={6}>
-                                    <Form.Control type="date" label="Date de début" />
-                                </Col>
-                                <Col md={6}>
-                                    <Form.Control type="date" label="Date de fin" />
-                                </Col>
-                            </Row>
                         </Form.Group>
                     </Form>
                 </Modal.Body>

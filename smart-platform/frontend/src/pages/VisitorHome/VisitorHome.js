@@ -321,10 +321,23 @@ const VisitorHome = () => {
 
                 {/* Section Événements */}
                 <section className="mb-5">
-                    <h2 className="section-title">
-                        <FaCalendarAlt className="me-2" />
-                        Prochains Événements
-                    </h2>
+                    <div className="d-flex justify-content-between align-items-center mb-4">
+
+                        <h2 className="section-title">
+                            <FaCalendarAlt className="me-2" />
+                            Prochains Événements
+                        </h2>
+
+                        {isLoggedIn && (userLevel === 'complexe' || userLevel === 'admin') && (
+                            <Button
+                                variant="primary"
+                                size="sm"
+                                onClick={() => navigate('/admindashboard/addEvent')}
+                            >
+                                Ajouter un évènement
+                            </Button>
+                        )}
+                    </div>
                     <Carousel indicators={false}>
                         {schoolData.events.map(event => (
                             <Carousel.Item key={event.id}>
