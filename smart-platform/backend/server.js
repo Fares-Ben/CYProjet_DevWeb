@@ -712,65 +712,135 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// Validation email
-app.post('/api/validate-email/:token', async (req, res) => {
-  const { token } = req.params;
+app.get('/api/validate-account', async (req, res) => {
+  const { token } = req.query;
+
+  const [users] = await pool.query(
+    'SELECT id, token_expiration FROM users WHERE validation_token = ?',
+    [token]
+  );
+
 
   if (!token) {
-    return res.status(400).json({ error: 'Token requis' });
+    return res.status(400).json({ error: 'Token de validation manquant.' });
   }
 
-  const connection = await pool.getConnection();
-
   try {
-    await connection.beginTransaction();
-
-    const [users] = await connection.query(
-      'SELECT id, token_expiration FROM users WHERE validation_token = ?',
-      [token]
-    );
 
     if (users.length === 0) {
-      return res.status(404).json({ error: 'Token invalide' });
+      return res.status(404).json({ error: 'Token invalide ou compte déjà validé.' });
     }
 
     const user = users[0];
     const now = new Date();
 
+
     if (new Date(user.token_expiration) < now) {
-      await connection.query('DELETE FROM users WHERE id = ?', [user.id]);
-      return res.status(400).json({ error: 'Token expiré. Veuillez vous réinscrire.' });
+      return res.status(400).json({ error: 'Le token a expiré. Veuillez vous réinscrire.' });
     }
 
-    // Validation email
-    await connection.query(
-      'UPDATE users SET email_verified = 1, validation_token = NULL, token_expiration = NULL WHERE id = ?',
-      [user.id]
-    );
 
-    // Enregistrement activité
-    await connection.query(
-      `INSERT INTO Users_activity 
-      (ID_user_changeur, ID_user_modified, type, ancienne_donnee, nouvelle_donnee, date) 
-      VALUES (0, ?, 'VALIDATION EMAIL', 0, 1, NOW())`,
-      [user.id]
-    );
-
-    await connection.commit();
-
-    res.json({
-      message: 'Email validé avec succès. Vous pouvez maintenant vous connecter.',
-      userId: user.id
+    res.status(200).json({
+      message: 'Compte validé avec succès. Vous pouvez maintenant vous connecter.',
+      userID: user.id
     });
+
   } catch (err) {
-    await connection.rollback();
-    console.error('Erreur validation email:', err);
-    res.status(500).json({ error: 'Erreur serveur' });
-  } finally {
-    connection.release();
+    console.error('Erreur lors de la validation du compte :', err);
+    res.status(500).json({ error: 'Erreur interne du serveur.' });
   }
 });
 
+
+// Endpoint pour valider un utilisateur
+app.post('/api/validate-email/:id', async (req, res) => {
+  const { id } = req.params;  // Récupération de l'ID à partir des paramètres de l'URL
+
+  try {
+
+    // Commence par effectuer les requêtes de mise à jour et attends qu'elles se terminent
+    await pool.query('UPDATE users SET email_verified = 1 WHERE id = ?', [id]);
+
+    await pool.query('UPDATE users SET validation_token = null WHERE id = ?', [id]);
+    await pool.query('UPDATE users SET token_expiration = null WHERE id = ?', [id]);
+    // 3. Enregistrement dans l'historique
+    await pool.query(
+      `INSERT INTO Users_activity 
+      (ID_user_changeur, ID_user_modified, type, ancienne_donnee, nouvelle_donnee, date) 
+      VALUES ('0', ?, 'VALIDATION EMAIL', ?, ?, NOW())`,
+      [req.params.id, 0, 1]
+    );
+
+    // Une fois toutes les requêtes terminées, envoie une réponse au client
+    res.status(200).json({ message: 'L\'email a été validé avec succès.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      error: 'Erreur de validation demail',
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+  }
+});
+
+// Validation email 
+/* app.post('/api/validate-email/:token', async (req, res) => {
+ const { token } = req.params;
+
+ if (!token) {
+   return res.status(400).json({ error: 'Token requis' });
+ }
+
+ const connection = await pool.getConnection();
+
+ try {
+   await connection.beginTransaction();
+
+   const [users] = await connection.query(
+     'SELECT id, token_expiration FROM users WHERE validation_token = ?',
+     [token]
+   );
+
+   if (users.length === 0) {
+     return res.status(404).json({ error: 'Token invalide' });
+   }
+
+   const user = users[0];
+   const now = new Date();
+
+   if (new Date(user.token_expiration) < now) {
+     await connection.query('DELETE FROM users WHERE id = ?', [user.id]);
+     return res.status(400).json({ error: 'Token expiré. Veuillez vous réinscrire.' });
+   }
+
+   // Validation email
+   await connection.query(
+     'UPDATE users SET email_verified = 1, validation_token = NULL, token_expiration = NULL WHERE id = ?',
+     [user.id]
+   );
+
+   // Enregistrement activité
+   await connection.query(
+     `INSERT INTO Users_activity 
+     (ID_user_changeur, ID_user_modified, type, ancienne_donnee, nouvelle_donnee, date) 
+     VALUES (0, ?, 'VALIDATION EMAIL', 0, 1, NOW())`,
+     [user.id]
+   );
+
+   await connection.commit();
+
+   res.json({
+     message: 'Email validé avec succès. Vous pouvez maintenant vous connecter.',
+     userId: user.id
+   });
+ } catch (err) {
+   await connection.rollback();
+   console.error('Erreur validation email:', err);
+   res.status(500).json({ error: 'Erreur serveur' });
+ } finally {
+   connection.release();
+ }
+});
+*/
 // Profil utilisateur
 app.get('/api/profile', authenticateToken, async (req, res) => {
   try {
@@ -1055,6 +1125,59 @@ app.post('/api/admin/announcements', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Erreur serveur lors de la création de l’annonce' });
   } finally {
     connection.release();
+  }
+});
+
+// Modifier une annonce
+app.put('/api/admin/announcements/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const { title, content, urgent, date } = req.body;
+
+  if (!title || !content || !date) {
+    return res.status(400).json({ error: 'Tous les champs obligatoires ne sont pas remplis' });
+  }
+
+  try {
+    const connection = await pool.getConnection();
+    const [result] = await connection.query(
+      `UPDATE announcements 
+       SET title = ?, content = ?, urgent = ?, date = ? 
+       WHERE id = ?`,
+      [title, content, urgent ? 1 : 0, date, id]
+    );
+    connection.release();
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Annonce non trouvée' });
+    }
+
+    res.json({ message: 'Annonce mise à jour avec succès' });
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour de l’annonce :', error);
+    res.status(500).json({ error: 'Erreur serveur lors de la mise à jour de l’annonce' });
+  }
+});
+
+// Supprimer une annonce
+app.delete('/api/admin/announcements/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const connection = await pool.getConnection();
+    const [result] = await connection.query(
+      `DELETE FROM announcements WHERE id = ?`,
+      [id]
+    );
+    connection.release();
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Annonce non trouvée' });
+    }
+
+    res.json({ message: 'Annonce supprimée avec succès' });
+  } catch (error) {
+    console.error('Erreur lors de la suppression de l’annonce :', error);
+    res.status(500).json({ error: 'Erreur serveur lors de la suppression de l’annonce' });
   }
 });
 

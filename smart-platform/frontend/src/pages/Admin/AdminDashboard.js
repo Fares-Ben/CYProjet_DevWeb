@@ -120,6 +120,41 @@ const AdminDashboard = () => {
         return date.toISOString().split('T')[0];
     };
 
+    const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
+    const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
+    const [announcementForm, setAnnouncementForm] = useState({
+        title: '',
+        content: '',
+        urgent: false,
+        date: '',
+        author: 'Admin',
+    });
+    const [announcementToDelete, setAnnouncementToDelete] = useState(null);
+    const handleAnnouncementChange = (e) => {
+        const { name, value, type, checked } = e.target;
+        setAnnouncementForm({
+            ...announcementForm,
+            [name]: type === 'checkbox' ? checked : value,
+        });
+    };
+
+    const handleEditClick = (announcement) => {
+        setSelectedAnnouncement(announcement);
+        setAnnouncementForm({
+            title: announcement.title,
+            content: announcement.content,
+            urgent: announcement.urgent,
+            date: announcement.date.split('T')[0], // format YYYY-MM-DD
+            author: announcement.author,
+        });
+        setShowAnnouncementModal(true);
+    };
+
+    const handleDeleteClick = (announcementId) => {
+        setAnnouncementToDelete(announcementId);
+        setShowConfirmModal(true);
+    };
+
     const formatRelativeTime = (dateString) => {
         const now = new Date();
         const date = new Date(dateString);
@@ -182,6 +217,7 @@ const AdminDashboard = () => {
                     inactiveDevices: devicesRes.data.filter(d => d.etat === 'inactif').length,
                     maintenanceDevices: devicesRes.data.filter(d => d.etat === 'maintenance').length,
                     totalEvents: eventsRes.data.length,
+                    totalAnnouncements: announcementsRes.data.length,
                     pendingRequests: pendingRes.data.length,
                     totalUsers: usersRes.data.length
                 },
@@ -323,6 +359,82 @@ const AdminDashboard = () => {
             showNotification(err.response?.data?.message || 'Erreur lors de la mise à jour', 'danger');
         }
     };
+
+
+    const handleUpdateAnnouncement = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            await axios.put(`${API_BASE_URL}/admin/announcements/${selectedAnnouncement.id}`, announcementForm, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+
+
+            const announcementsRes = await axios.get(
+                `${API_BASE_URL}/announcements`,
+                { headers: { 'Authorization': `Bearer ${token}` } }
+            );
+            setShowAnnouncementModal(false);
+            setDashboardData(prev => ({
+                ...prev,
+                announcements: announcementsRes.data,
+            }));
+
+            // refresh data
+        } catch (error) {
+            console.error("Erreur lors de la mise à jour :", error);
+        }
+    };
+
+    /* const handleConfirmDelete = async () => {
+    try {
+          const token = localStorage.getItem('token');
+            await axios.delete(`${API_BASE_URL}/admin/announcements/${announcementToDelete}`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            setShowConfirmModal(false);
+            setAnnouncementToDelete(null);
+
+
+        } catch (error) {
+            console.error("Erreur lors de la suppression :", error);
+        }
+    }; */
+
+    const handleConfirmDelete = async (announcementId) => {
+        try {
+            const token = localStorage.getItem('token');
+
+            // Supprimer l'événement
+            await axios.delete(`${API_BASE_URL}/admin/announcements/${announcementToDelete}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            // Récupérer les événements après suppression
+            const announcementsRes = await axios.get(`${API_BASE_URL}/admin/announcements`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            // Mettre à jour l'état avec les événements actualisés
+            setDashboardData(prev => ({
+                ...prev,
+                announcements: announcementsRes.data,
+                stats: {
+                    ...prev.stats,
+                    totalAnnouncements: announcementsRes.data.length,  // Mettre à jour le nombre d'événements
+                }
+            }));
+
+            // Afficher une notification de succès
+            showNotification('Annonce supprimée avec succès');
+
+        } catch (error) {
+            console.error("Erreur lors de la suppression de l'annonce :", error);
+            // Afficher une notification d'erreur
+            showNotification(error.response?.data?.message || 'Erreur lors de la suppression de l\'annonce', 'danger');
+        }
+    };
+
+
 
     // Gestion des appareils
     const handleDeviceUpdate = async () => {
@@ -475,12 +587,20 @@ const AdminDashboard = () => {
     };
 
     // Filtrage des données
-    // Remplacer la ligne qui cause l'erreur (probablement ligne 82315) par :
     const filteredUsers = (dashboardData?.users || []).filter(user =>
         user?.pseudo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user?.nom?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user?.prenom?.toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    // Et ajouter en haut de votre composant :
+    if (!dashboardData || !dashboardData.devices) {
+        return (
+            <div className="d-flex justify-content-center align-items-center" style={{ height: '100vh' }}>
+                <Spinner animation="border" variant="primary" />
+            </div>
+        );
+    }
 
     const filteredDevices = dashboardData.devices.filter(device => {
         if (!device) return false;
@@ -501,14 +621,7 @@ const AdminDashboard = () => {
         return textMatch && typeMatch && statusMatch && locationMatch;
     });
 
-    // Et ajouter en haut de votre composant :
-    if (!dashboardData) {
-        return (
-            <div className="d-flex justify-content-center align-items-center" style={{ height: '100vh' }}>
-                <Spinner animation="border" variant="primary" />
-            </div>
-        );
-    }
+
 
     // Calcul des pourcentages pour les ProgressBar
     const activeDevicesPercent = dashboardData.devices.length > 0 ?
@@ -1467,13 +1580,24 @@ const AdminDashboard = () => {
                                                 )}
                                             </td>
                                             <td>
-                                                <Button variant="outline-primary" size="sm" className="me-2">
+
+                                                <Button
+                                                    variant="outline-primary"
+                                                    size="sm"
+                                                    className="me-2"
+                                                    onClick={() => handleEditClick(announcement)}
+                                                >
                                                     <FaEdit />
                                                 </Button>
-                                                <Button variant="outline-danger" size="sm">
+                                                <Button
+                                                    variant="outline-danger"
+                                                    size="sm"
+                                                    onClick={() => handleDeleteClick(announcement.id)}
+                                                >
                                                     <FaTrash />
                                                 </Button>
                                             </td>
+
                                         </tr>
                                     ))}
                                 </tbody>
@@ -1734,6 +1858,83 @@ const AdminDashboard = () => {
                     </Button>
                 </Modal.Footer>
             </Modal>
+
+
+            <Modal show={showAnnouncementModal} onHide={() => setShowAnnouncementModal(false)} size="lg">
+                <Modal.Header closeButton>
+                    <Modal.Title>Modifier l’annonce</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <Form>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Titre</Form.Label>
+                            <Form.Control
+                                type="text"
+                                name="title"
+                                value={announcementForm.title}
+                                onChange={handleAnnouncementChange}
+                                required
+                            />
+                        </Form.Group>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Contenu</Form.Label>
+                            <Form.Control
+                                as="textarea"
+                                name="content"
+                                rows={4}
+                                value={announcementForm.content}
+                                onChange={handleAnnouncementChange}
+                                required
+                            />
+                        </Form.Group>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Date</Form.Label>
+                            <Form.Control
+                                type="date"
+                                name="date"
+                                value={announcementForm.date}
+                                onChange={handleAnnouncementChange}
+                                required
+                            />
+                        </Form.Group>
+                        <Form.Group className="mb-3" controlId="urgentCheckbox">
+                            <Form.Check
+                                type="checkbox"
+                                label="Urgent"
+                                name="urgent"
+                                checked={announcementForm.urgent}
+                                onChange={handleAnnouncementChange}
+                            />
+                        </Form.Group>
+                    </Form>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={() => setShowAnnouncementModal(false)}>
+                        Annuler
+                    </Button>
+                    <Button variant="primary" onClick={handleUpdateAnnouncement}>
+                        Mettre à jour
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+
+            <Modal show={showConfirmModal} onHide={() => setShowConfirmModal(false)} centered>
+                <Modal.Header closeButton>
+                    <Modal.Title>Confirmer la suppression</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    Êtes-vous sûr de vouloir supprimer cette annonce ? Cette action est irréversible.
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={() => setShowConfirmModal(false)}>
+                        Annuler
+                    </Button>
+                    <Button variant="danger" onClick={handleConfirmDelete}>
+                        Supprimer
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+
 
             {/* Device Modal */}
             <Modal show={showDeviceModal} onHide={() => {

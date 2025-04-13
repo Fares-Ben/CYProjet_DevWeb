@@ -13,9 +13,18 @@ const ValidateAccountPage = () => {
     useEffect(() => {
         const validateAccount = async () => {
             try {
+                console.log('Token envoyé à l\'API :', token);
+                console.log("ici ok ? on est juste avant ici");
+
+                // Requête pour valider l'account avec le token
+                const response = await axios.get(`http://localhost:3001/api/validate-account?token=${token}`, {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
 
                 // Envoi de la requête pour valider l'email avec l'ID récupéré
-                const response = await axios.post(`http://localhost:3001/api/validate-email/${response.data.userID}`, {}, {
+                await axios.post(`http://localhost:3001/api/validate-email/${response.data.userID}`, {}, {
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
@@ -90,4 +99,4 @@ const ValidateAccountPage = () => {
     );
 };
 
-export default ValidateAccountPage;
+export default ValidateAccountPage
