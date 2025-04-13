@@ -499,7 +499,7 @@ const AdminDashboard = () => {
 
         // Filtres supplémentaires
         const typeMatch = !filters.type || device.type === filters.type;
-        const statusMatch = !filters.status || device.status === filters.status;
+        const statusMatch = !filters.status || device.etat === filters.status;
         const locationMatch = !filters.location || device.location === filters.location;
 
         return textMatch && typeMatch && statusMatch && locationMatch;
@@ -1111,7 +1111,7 @@ const AdminDashboard = () => {
                                         </Form.Label>
                                         <Form.Control
                                             type="text"
-                                            placeholder="Rechercher par nom, type, localisation ou statut..."
+                                            placeholder="Rechercher par nom, type, localisation..."
                                             value={deviceSearchTerm}
                                             onChange={(e) => setDeviceSearchTerm(e.target.value)}
                                         />
