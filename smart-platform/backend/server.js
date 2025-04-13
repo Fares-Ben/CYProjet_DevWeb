@@ -808,7 +808,7 @@ app.post('/api/admin/post-devices', authenticateToken, async (req, res) => {
     Date_debut_maintenance, Date_fin_maintenance
   } = req.body;
 
-  const [result] = await db.promise().query(`
+  const [result] = await pool.query(`
       INSERT INTO smart_devices 
       (name, type, location, etat, consommation, Date_derniere_activite, Date_debut_maintenance, Date_fin_maintenance)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -823,7 +823,7 @@ app.post('/api/admin/post-devices', authenticateToken, async (req, res) => {
 
 
   // 3. Enregistrement dans l'historique
-  await db.promise().query(
+  await pool.query(
     `INSERT INTO objects_activity 
           (ID_user_changeur, ID_object_modified, type, ancienne_donnee, nouvelle_donnee, date) 
           VALUES (?, ?, 'AJOUT NOUVEAU APPAREIL', '0', 'nouveau appreil', NOW())`,
@@ -838,7 +838,7 @@ app.post('/api/admin/post-devices', authenticateToken, async (req, res) => {
       const deviceId = req.params.deviceId;
 
       // Vérification que l'appareil existe
-      const [device] = await db.promise().query(
+      const [device] = await pool.query(
         'SELECT id FROM smart_devices WHERE id = ?',
         [deviceId]
       );
@@ -848,7 +848,7 @@ app.post('/api/admin/post-devices', authenticateToken, async (req, res) => {
       }
 
       // Suppression de l'appareil
-      await db.promise().query(
+      await pool.query(
         'DELETE FROM smart_devices WHERE id = ?',
         [deviceId]
       );
@@ -873,7 +873,7 @@ app.put('/api/admin/devices/:id', authenticateToken, async (req, res) => {
     Date_debut_maintenance, Date_fin_maintenance
   } = req.body;
 
-  await db.promise().query(`
+  await pool.query(`
       UPDATE smart_devices SET 
       name = ?, type = ?, location = ?, etat = ?, 
       consommation = ?, Date_derniere_activite = ?, 
@@ -1033,7 +1033,7 @@ app.put('/api/profiles/:id', authenticateToken, (req, res) => {
   console.log('Contenu reçu pour update yaaa :', req.body);
 
   // Vérifier si l'utilisateur existe
-  db.query('SELECT * FROM users WHERE id = ?', [userId], (err, result) => {
+  pool.query('SELECT * FROM users WHERE id = ?', [userId], (err, result) => {
     if (err) {
       return res.status(500).send('Erreur de base de données');
     }
@@ -1057,7 +1057,7 @@ app.put('/api/profiles/:id', authenticateToken, (req, res) => {
       pseudo: pseudo || user.pseudo,
     };
 
-    db.query(
+    pool.query(
       'UPDATE users SET nom = ?, prenom = ?, email = ?, pseudo = ? WHERE id = ?',
       [updatedUser.nom, updatedUser.prenom, updatedUser.email, updatedUser.pseudo, userId],
       (err, result) => {
