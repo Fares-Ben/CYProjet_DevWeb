@@ -884,7 +884,54 @@ app.put('/api/admin/put-devices/:id', authenticateToken, async (req, res) => {
   res.json({ message: 'Appareil mis à jour' });
 });
 
+// Route PUT pour modifier les informations de l'utilisateur
+app.put('/api/profiles/:id', authenticateToken, (req, res) => {
+  const userId = parseInt(req.params.id); // Récupérer l'ID de l'utilisateur depuis l'URL
+  const { nom, prenom, email, pseudo } = req.body; // Récupérer les nouvelles données dans le corps de la requête
 
+  console.log('Contenu reçu pour update yaaa :', req.body);
+        
+  // Vérifier si l'utilisateur existe
+  db.query('SELECT * FROM users WHERE id = ?', [userId], (err, result) => {
+    if (err) {
+      return res.status(500).send('Erreur de base de données');
+    }
+
+    if (result.length === 0) {
+      return res.status(404).send('Utilisateur non trouvé');
+    }
+
+    const user = result[0];
+
+    // Vérifier si l'utilisateur connecté est celui qui essaie de modifier les données
+    if (user.id !== req.user.id) {
+      return res.status(403).send('Vous ne pouvez pas modifier les données d\'un autre utilisateur');
+    }
+
+    // Mettre à jour les informations de l'utilisateur
+    const updatedUser = {
+      nom: nom || user.nom,
+      prenom: prenom || user.prenom,
+      email: email || user.email,
+      pseudo: pseudo || user.pseudo,
+    };
+
+    db.query(
+      'UPDATE users SET nom = ?, prenom = ?, email = ?, pseudo = ? WHERE id = ?',
+      [updatedUser.nom, updatedUser.prenom ,updatedUser.email, updatedUser.pseudo, userId],
+      (err, result) => {
+        if (err) {
+          return res.status(500).send('Erreur lors de la mise à jour des données');
+        }
+
+        res.json({
+          message: 'Informations mises à jour avec succès',
+          user: updatedUser,
+        });
+      }
+    );
+  });
+});
 
 
 /* ************************* */

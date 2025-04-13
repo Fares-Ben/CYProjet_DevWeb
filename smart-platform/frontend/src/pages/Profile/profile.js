@@ -4,6 +4,7 @@ const Profile = () => {
   const [userInfo, setUserInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);  // Nouveau state pour gérer l'édition
 
   const token = localStorage.getItem('token');  // Récupérer le token du localStorage
   console.log('Token récupéré :', token);
@@ -43,6 +44,39 @@ const Profile = () => {
     }
   }, [token]);
 
+  // Fonction pour gérer la mise à jour des données utilisateur
+  const handleUpdate = async (updatedUserInfo) => {
+    const token = localStorage.getItem('token');  // Récupérer le token depuis le localStorage
+
+    if (token) {
+      try {
+        console.log('Contenu de updatedUserInfo :', updatedUserInfo);
+        const response = await fetch(`http://localhost:3001/api/profiles/${updatedUserInfo.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify(updatedUserInfo),  // Les nouvelles informations de l'utilisateur
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          alert('Informations mises à jour avec succès');
+          // Mettre à jour l'état local avec les nouvelles données
+          setUserInfo(data);
+          setIsEditing(false);  // Fermer le mode édition après la mise à jour
+          window.location.reload();
+        } else {
+          alert(data.message || 'Erreur lors de la mise à jour');
+        }
+      } catch (err) {
+        console.error('Erreur lors de la mise à jour :', err);
+      }
+    }
+  };
+
   if (loading) {
     return <div>Chargement...</div>;
   }
@@ -61,19 +95,47 @@ const Profile = () => {
               {userInfo.photo && <img src={userInfo.photo} alt={userInfo.pseudo || "Utilisateur"} className="img-fluid rounded-circle" />}
             </div>
             <div className="col-md-8">
-              <p><strong>Nom :</strong> {userInfo.nom}</p>
-              <p><strong>Prénom :</strong> {userInfo.prenom}</p>
-              <p><strong>Date de naissance :</strong> {new Date(userInfo.date_naissance).toLocaleDateString()}</p>
-              <p><strong>Fonction :</strong> {userInfo.fonction}</p>
-              <p><strong>Email :</strong> {userInfo.email}</p>
-              <p><strong>Pseudo :</strong> {userInfo.pseudo}</p>
-              <p><strong>Niveau :</strong> {userInfo.niveau}</p>
-              <p><strong>Points :</strong> {userInfo.points}</p>
-              <p><strong>Dernière connexion :</strong> {new Date(userInfo.last_connexion).toLocaleString()}</p>
-              <p><strong>Nombre de connexions :</strong> {userInfo.nb_connexions}</p>
-              <p><strong>Nombre d'actions :</strong> {userInfo.nb_actions}</p>
-              <p><strong>Thème préféré :</strong> {userInfo.theme_prefere}</p>
-              <p><strong>Date d'inscription :</strong> {new Date(userInfo.date_inscription).toLocaleDateString()}</p>
+              {isEditing ? (
+                // Formulaire pour modifier les données
+                <form onSubmit={(e) => { e.preventDefault(); handleUpdate(userInfo); }}>
+                  <div>
+                    <label>Nom</label>
+                    <input
+                      type="text"
+                      value={userInfo.nom}
+                      onChange={(e) => setUserInfo({ ...userInfo, nom: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label>Prénom</label>
+                    <input
+                      type="text"
+                      value={userInfo.prenom}
+                      onChange={(e) => setUserInfo({ ...userInfo, prenom: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label>Email</label>
+                    <input
+                      type="email"
+                      value={userInfo.email}
+                      onChange={(e) => setUserInfo({ ...userInfo, email: e.target.value })}
+                    />
+                  </div>
+                  <button type="submit">Enregistrer</button>
+                </form>
+              ) : (
+                // Affichage des informations si pas en mode édition
+                <>
+                  <p><strong>Nom :</strong> {userInfo.nom}</p>
+                  <p><strong>Prénom :</strong> {userInfo.prenom}</p>
+                  <p><strong>Date de naissance :</strong> {new Date(userInfo.date_naissance).toLocaleDateString()}</p>
+                  <p><strong>Fonction :</strong> {userInfo.fonction}</p>
+                  <p><strong>Email :</strong> {userInfo.email}</p>
+                  <p><strong>Pseudo :</strong> {userInfo.pseudo}</p>
+                  <button onClick={() => setIsEditing(true)}>Modifier</button>
+                </>
+              )}
             </div>
           </div>
         </div>
