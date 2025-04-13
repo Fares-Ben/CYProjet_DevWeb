@@ -163,10 +163,10 @@ const AdminDashboard = () => {
             ] = await Promise.all([
                 axios.get(`${API_BASE_URL}/admin/users`, { headers }),
                 axios.get(`${API_BASE_URL}/admin/pending-users`, { headers }),
-                axios.get(`${API_BASE_URL}/admin/classes`, { headers }),
-                axios.get(`${API_BASE_URL}/admin/smart_devices`, { headers }),
-                axios.get(`${API_BASE_URL}/admin/announcements`, { headers }),
-                axios.get(`${API_BASE_URL}/admin/events`, { headers }),
+                axios.get(`${API_BASE_URL}/classes`, { headers }),
+                axios.get(`${API_BASE_URL}/smart-devices`, { headers }),
+                axios.get(`${API_BASE_URL}/announcements`, { headers }),
+                axios.get(`${API_BASE_URL}/events`, { headers }),
                 axios.get(`${API_BASE_URL}/admin/stats`, { headers }),
                 axios.get(`${API_BASE_URL}/admin/users-activity`, { headers })
             ]);
@@ -343,7 +343,7 @@ const AdminDashboard = () => {
                 );
             } else {
                 await axios.post(
-                    `${API_BASE_URL}/admin/devices`,
+                    `${API_BASE_URL}/admin/post-devices`,
                     deviceForm,
                     { headers: { 'Authorization': `Bearer ${token}` } }
                 );
