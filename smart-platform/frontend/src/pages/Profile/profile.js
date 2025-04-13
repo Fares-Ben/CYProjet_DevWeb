@@ -50,6 +50,7 @@ const Profile = () => {
 
     if (token) {
       try {
+        console.log('Contenu de updatedUserInfo :', updatedUserInfo);
         const response = await fetch(`http://localhost:3001/api/profiles/${updatedUserInfo.id}`, {
           method: 'PUT',
           headers: {
@@ -66,6 +67,7 @@ const Profile = () => {
           // Mettre à jour l'état local avec les nouvelles données
           setUserInfo(data);
           setIsEditing(false);  // Fermer le mode édition après la mise à jour
+          window.location.reload();
         } else {
           alert(data.message || 'Erreur lors de la mise à jour');
         }
