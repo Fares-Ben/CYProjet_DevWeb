@@ -884,65 +884,166 @@ app.put('/api/admin/put-devices/:id', authenticateToken, async (req, res) => {
   res.json({ message: 'Appareil mis à jour' });
 });
 
+//génération d'un fichier pdf ou csv
 const { createObjectCsvWriter } = require('csv-writer');
 const path = require('path');
 const PDFDocument = require('pdfkit');
 
-app.get('/api/admin/generate-report', (req, res) => {
+app.get('/api/admin/generate-report', async (req, res) => {
   const format = req.query.format;
-  try {
-    if (format === 'pdf'){
-      
-    const doc = new PDFDocument();
+  const type = req.query.type;
+  //génératino du pdf
+  if (format === 'pdf'){
+    try{
+      if (type === 'energy') {
+        
+        const [rows] = await db.promise().query('SELECT SUM(consommation) as consoTotale, COUNT(*) as count FROM smart_devices');
+        const [conso] = await db.promise().query('SELECT name, consommation FROM smart_devices GROUP BY name HAVING consommation IS NOT NULL ORDER BY consommation DESC LIMIT 1');
+        
+        const tot = rows[0].consoTotale;
+        const nb = rows[0].count;
+        const max = conso[0].name;
+        
+        const doc = new PDFDocument();
 
-    res.setHeader('Content-Disposition', 'attachment; filename=rapport.pdf');
-    res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename=rapport.pdf');
+        res.setHeader('Content-Type', 'application/pdf');
 
-    doc.pipe(res);
+        doc.pipe(res);
 
-    doc.fontSize(20).text('Rapport Administratif', { align: 'center' });
-    doc.moveDown();
-    doc.fontSize(14).text(`Rapport généré le ${new Date().toLocaleDateString('fr-FR')}`);
-    doc.moveDown();
-    doc.fontSize(12).text('Voici un aperçu global du système :');
-    doc.text('- 120 utilisateurs');
-    doc.text('- 10 classes');
-    doc.text('- 85 appareils actifs');
-    doc.text('- 920 kWh consommés ce mois-ci');
+        doc.fontSize(20).text('Rapport sur la consommation énergétique des appareils', { align: 'center' });
+        doc.moveDown();
+        doc.fontSize(14).text(`Rapport généré le ${new Date().toLocaleDateString('fr-FR')}`);
+        doc.moveDown();
+        doc.fontSize(12).text('Voici un aperçu global:');
+        doc.text(`- Consommation totale: ${tot}`);
+        doc.text(`- Nombre totale d'appareil: ${nb}`);
+        doc.text(`- Appareil consommant le plus: ${max}`);
 
-    doc.end();
-  
+        doc.end();
+      } else if (type === 'users'){
+        
+        const [rows] = await db.promise().query('SELECT COUNT(*) as count FROM smart_devices');
+        const [act] = await db.promise().query('SELECT nom, prenom, nb_actions FROM users GROUP BY nom HAVING nb_actions IS NOT NULL ORDER BY nb_actions DESC LIMIT 1');
+        
+        const tot = rows[0].consoTotale;
+        const nb = rows[0].count;
+        const nomMax = act[0].nom;
+        const prenomMax = act[0].prenom;
+        
+        const doc = new PDFDocument();
+
+        res.setHeader('Content-Disposition', 'attachment; filename=rapport.pdf');
+        res.setHeader('Content-Type', 'application/pdf');
+
+        doc.pipe(res);
+
+        doc.fontSize(20).text('Rapport sur les activités des utilisateurs', { align: 'center' });
+        doc.moveDown();
+        doc.fontSize(14).text(`Rapport généré le ${new Date().toLocaleDateString('fr-FR')}`);
+        doc.moveDown();
+        doc.fontSize(12).text('Voici un aperçu global:');
+        doc.text(`- Nombre totale d'utilisateurs: ${nb}`);
+        doc.text(`- Utilisateur le plus actif: ${nomMax} ${prenomMax}`);
+
+        doc.end();
+      } else {
+        
+        const [rows] = await db.promise().query('SELECT COUNT(*) as count FROM smart_devices');
+        const [act] = await db.promise().query('SELECT name, Date_derniere_activite FROM smart_devices GROUP BY name HAVING Date_derniere_activite IS NOT NULL ORDER BY Date_derniere_activite DESC LIMIT 1');
+        
+        const nb = rows[0].count;
+        const max = act[0].name;
+        
+        const doc = new PDFDocument();
+
+        res.setHeader('Content-Disposition', 'attachment; filename=rapport.pdf');
+        res.setHeader('Content-Type', 'application/pdf');
+
+        doc.pipe(res);
+
+        doc.fontSize(20).text("Rapport sur l'utilisation des appareils", { align: 'center' });
+        doc.moveDown();
+        doc.fontSize(14).text(`Rapport généré le ${new Date().toLocaleDateString('fr-FR')}`);
+        doc.moveDown();
+        doc.fontSize(12).text('Voici un aperçu global:');
+        doc.text(`- Nombre totale d'appareil: ${nb}`);
+        doc.text(`- Appareil le plus récemment utilisé: ${max}`);
+      }
+    }catch (err) {
+      console.error("Erreur génération PDF :", err);
+      res.status(500).json({ error: "Erreur lors de la génération du PDF" });
+    }
+    //génération du csv
     } else {
-      const csvWriter = createObjectCsvWriter({
-        path: path.join(__dirname, 'rapport.csv'),
-        header: [
-            { id: 'name', title: 'Name' },
-            { id: 'age', title: 'Age' },
-            { id: 'city', title: 'City' }
-        ]
-    });
+      try {
+      if (type === 'energy'){
+        const [rows] = await db.promise().query('SELECT name, type, location, consommation FROM smart_devices');
 
-    const records = [
-        { name: 'Alice', age: 25, city: 'Paris' },
-        { name: 'Bob', age: 30, city: 'Lyon' },
-        { name: 'Charlie', age: 35, city: 'Marseille' }
-    ];
+        const csvPath = path.join(__dirname, 'rapport.csv');
+        const csvWriter = createObjectCsvWriter({
+            path: csvPath,
+            header: [
+                { id: 'name', title: 'Nom' },
+                { id: 'type', title: 'Type'},
+                { id: 'location', title: 'Location'},
+                { id: 'consommation', title: 'Consommation' }
+            ]
+        });
+      
+        await csvWriter.writeRecords(rows);
+    
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', 'attachment; filename="rapport.csv"');
+        res.sendFile(csvPath);
 
-    csvWriter.writeRecords(records)
-        .then(() => {
+    } else if (type === 'users'){
+      const [rows] = await db.promise().query('SELECT nom, prenom, fonction, niveau, nb_actions FROM users');
+
+        const csvPath = path.join(__dirname, 'rapport.csv');
+        const csvWriter = createObjectCsvWriter({
+            path: csvPath,
+            header: [
+                { id: 'nom', title: 'Nom' },
+                { id: 'prenom', title: 'Prenom'},
+                { id: 'fonction', title: 'Fonction'},
+                { id: 'niveau', title: 'Niveau' },
+                { id: 'nb_actions', title: "Nombre d'actions"}
+            ]
+          });
+      
+          await csvWriter.writeRecords(rows);
+      
+          res.setHeader('Content-Type', 'text/csv');
+          res.setHeader('Content-Disposition', 'attachment; filename="rapport.csv"');
+          res.sendFile(csvPath);
+
+      } else {
+        const [rows] = await db.promise().query('SELECT name, type, location, Date_derniere_activite FROM smart_devices');
+
+        const csvPath = path.join(__dirname, 'rapport.csv');
+        const csvWriter = createObjectCsvWriter({
+            path: csvPath,
+            header: [
+                { id: 'name', title: 'Nom' },
+                { id: 'type', title: 'Type'},
+                { id: 'location', title: 'Location'},
+                { id: 'Date_derniere_activite', title: 'Dernière activité' }
+              ]
+            });
+      
+            await csvWriter.writeRecords(rows);
+        
             res.setHeader('Content-Type', 'text/csv');
             res.setHeader('Content-Disposition', 'attachment; filename="rapport.csv"');
-            res.sendFile(path.join(__dirname, 'rapport.csv')); 
-        })
-        .catch(err => {
-            res.status(500).send('Erreur lors de la génération du CSV');
-        });
-    }
-  } catch (err) {
-    console.error("Erreur génération PDF :", err);
-    res.status(500).json({ error: "Erreur lors de la génération du PDF" });
-  }
-});
+            res.sendFile(csvPath);
+
+      }
+  } catch (error) {
+        console.error(error);
+        res.status(500).send('Erreur lors de la génération du fichier CSV');
+    }}
+  });
 
 
 

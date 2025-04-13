@@ -429,7 +429,7 @@ const AdminDashboard = () => {
 
     const handleGenerateReport = async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/admin/generate-report?format=${exportFormat}`, {
+            const response = await fetch(`${API_BASE_URL}/admin/generate-report?format=${exportFormat}&type=${reportType}`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -440,7 +440,13 @@ const AdminDashboard = () => {
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `rapport de consommation.${exportFormat}`
+            if (reportType === 'energy'){
+                a.download = `rapport_sur_consommation.${exportFormat}`;
+            }else if (reportType === 'usage') {
+                a.download = `rapport_sur_utilisation.${exportFormat}`;
+            } else {
+                a.download = `rapport_sur_utilisateurs.${exportFormat}`;              
+            }
             a.click();
     
             setToastMessage('Rapport PDF téléchargé avec succès');
@@ -1469,7 +1475,6 @@ const AdminDashboard = () => {
                                 <option value="usage">Utilisation des appareils</option>
                                 <option value="energy">Consommation énergétique</option>
                                 <option value="users">Activité des utilisateurs</option>
-                                <option value="maintenance">Maintenance</option>
                             </Form.Select>
                         </Form.Group>
 
