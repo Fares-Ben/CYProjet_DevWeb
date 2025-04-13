@@ -1024,6 +1024,40 @@ app.post('/api/admin/events', authenticateToken, async (req, res) => {
   }
 });
 
+// ✅ Créer une annonce
+app.post('/api/admin/announcements', authenticateToken, async (req, res) => {
+  const { title, content, urgent, date, author } = req.body;
+
+  if (!title || !content || !date || !author) {
+    return res.status(400).json({ error: 'Tous les champs requis ne sont pas remplis' });
+  }
+
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.query(
+      `INSERT INTO announcements 
+        (title, content, urgent, date, author, created_by) 
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        title,
+        content,
+        urgent ? 1 : 0,
+        date,
+        author,
+        req.user.id // ID de l'admin qui a posté l’annonce
+      ]
+    );
+
+    res.status(201).json({ message: 'Annonce créée avec succès' });
+  } catch (err) {
+    console.error('Erreur lors de la création de l’annonce :', err);
+    res.status(500).json({ error: 'Erreur serveur lors de la création de l’annonce' });
+  } finally {
+    connection.release();
+  }
+});
+
 
 // Route PUT pour modifier les informations de l'utilisateur
 app.put('/api/profiles/:id', authenticateToken, (req, res) => {
