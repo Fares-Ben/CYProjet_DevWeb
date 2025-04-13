@@ -38,7 +38,6 @@ const API_BASE_URL = 'http://localhost:3001/api';
 const VisitorHome = () => {
     const navigate = useNavigate();
     const [schoolData, setSchoolData] = useState({
-        classes: [],
         announcements: [],
         events: [],
         smartDevices: [],
@@ -57,7 +56,7 @@ const VisitorHome = () => {
     const [currentDevice, setCurrentDevice] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [deviceForm, setDeviceForm] = useState({});
-    
+
 
     // Ajoutez ceci dans la fonction verifyToken
     const verifyToken = async (token) => {
@@ -99,13 +98,7 @@ const VisitorHome = () => {
     const fetchData = async () => {
         try {
             const token = localStorage.getItem('token');
-            const [classesRes, announcementsRes, eventsRes, devicesRes, usersRes] = await Promise.all([
-                fetch(`${API_BASE_URL}/classes`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
-                }),
+            const [announcementsRes, eventsRes, devicesRes, usersRes] = await Promise.all([
                 fetch(`${API_BASE_URL}/announcements`, {
                     headers: {
                         'Authorization': `Bearer ${token}`,
@@ -132,8 +125,7 @@ const VisitorHome = () => {
                 }) : Promise.resolve(null)
             ]);
 
-            const [classes, announcements, events, smartDevices] = await Promise.all([
-                classesRes.json(),
+            const [announcements, events, smartDevices] = await Promise.all([
                 announcementsRes.json(),
                 eventsRes.json(),
                 devicesRes.json()
@@ -144,7 +136,7 @@ const VisitorHome = () => {
                 users = await usersRes.json();
             }
 
-            setSchoolData({ classes, announcements, events, smartDevices, users });
+            setSchoolData({ announcements, events, smartDevices, users });
         } catch (error) {
             console.error('Erreur lors du chargement des données:', error);
         }
@@ -219,8 +211,8 @@ const VisitorHome = () => {
     const filteredDevices = schoolData.smartDevices.filter(device =>
         (filters.deviceType ? device.type === filters.deviceType : true) &&
         (filters.location ? device.location === filters.location : true) &&
-        (searchTerm ? 
-            device.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        (searchTerm ?
+            device.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             device.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
             device.type.toLowerCase().includes(searchTerm.toLowerCase())
             : true)
@@ -326,39 +318,6 @@ const VisitorHome = () => {
 
             {/* Sections principales */}
             <Container className="school-sections">
-                {/* Section Classes */}
-                <section className="mb-5">
-                    <h2 className="section-title">
-                        <FaChalkboardTeacher className="me-2" />
-                        Nos Classes
-                    </h2>
-                    <Row>
-                        {schoolData.classes.map(classItem => (
-                            <Col key={classItem.id} md={6} className="mb-4">
-                                <Card className="class-card h-100">
-                                    <Card.Body>
-                                        <Card.Title>{classItem.name}</Card.Title>
-                                        <Card.Subtitle className="mb-2 text-muted">
-                                            Professeur: {classItem.teacher}
-                                        </Card.Subtitle>
-                                        <Card.Text>
-                                            <span className="badge bg-primary">
-                                                {classItem.students} élèves
-                                            </span>
-                                        </Card.Text>
-                                        {isLoggedIn && (userLevel === 'complexe' || userLevel === 'admin') && (
-                                            <>
-                                                <Button variant="outline-primary" size="sm">
-                                                    Voir le dashboard
-                                                </Button>
-                                            </>
-                                        )}
-                                    </Card.Body>
-                                </Card>
-                            </Col>
-                        ))}
-                    </Row>
-                </section>
 
                 {/* Section Événements */}
                 <section className="mb-5">
@@ -406,7 +365,7 @@ const VisitorHome = () => {
                             </Button>
                         )}
                     </div>
-                    
+
                     {/* BARRE DE RECHERCHE */}
                     <Card className="mb-4 search-card">
                         <Card.Body>
@@ -525,123 +484,6 @@ const VisitorHome = () => {
                     </Row>
                 </section>
 
-                {/* Section Appareils Connectés */}
-                <section className="mb-5">
-                    <div className="d-flex justify-content-between align-items-center mb-4">
-                        <h2 className="section-title m-0">
-                            <i className="bi bi-cpu me-2"></i>
-                            Appareils Connectés
-                        </h2>
-                        {isLoggedIn && (userLevel === 'complexe' || userLevel === 'admin') && (
-                            <Button
-                                variant="primary"
-                                size="sm"
-                                onClick={() => navigate('/add-device')}
-                            >
-                                Ajouter un appareil
-                            </Button>
-                        )}
-                    </div>
-
-                    {/* Filtres */}
-                    <Card className="mb-4 filter-card">
-                        <Card.Body>
-                            <Row>
-                                <Col md={5}>
-                                    <Form.Group>
-                                        <Form.Label>
-                                            <FaSearch className="me-2" />
-                                            Type d'appareil
-                                        </Form.Label>
-                                        <Form.Select
-                                            value={filters.deviceType}
-                                            onChange={(e) => setFilters({ ...filters, deviceType: e.target.value })}
-                                        >
-                                            <option value="">Tous les types</option>
-                                            <option value="tableau">Tableaux interactifs</option>
-                                            <option value="climatisation">Climatisation</option>
-                                            <option value="securite">Sécurité</option>
-                                        </Form.Select>
-                                    </Form.Group>
-                                </Col>
-                                <Col md={5}>
-                                    <Form.Group>
-                                        <Form.Label>Localisation</Form.Label>
-                                        <Form.Select
-                                            value={filters.location}
-                                            onChange={(e) => setFilters({ ...filters, location: e.target.value })}
-                                        >
-                                            <option value="">Toutes les zones</option>
-                                            <option value="Salle B12">Salle B12</option>
-                                            <option value="Cour principale">Cour principale</option>
-                                        </Form.Select>
-                                    </Form.Group>
-                                </Col>
-                                <Col md={2} className="d-flex align-items-end">
-                                    <Button
-                                        variant="outline-secondary"
-                                        onClick={() => setFilters({ deviceType: '', location: '' })}
-                                    >
-                                        Réinitialiser
-                                    </Button>
-                                </Col>
-                            </Row>
-                        </Card.Body>
-                    </Card>
-
-                    {/* Liste des appareils */}
-                    <Row>
-                        {filteredDevices.map(device => (
-                            <Col key={device.id} xl={3} lg={4} md={6} className="mb-4">
-                                <Card className="device-card h-100">
-                                    <Card.Body>
-                                        <div className="device-header">
-                                            <Card.Title>{device.name}</Card.Title>
-                                            <Badge
-                                                bg={device.status === 'actif' ? 'success' :
-                                                    device.status === 'maintenance' ? 'warning' : 'secondary'}
-                                            >
-                                                {device.status}
-                                            </Badge>
-                                        </div>
-                                        <Card.Subtitle className="mb-2 text-muted">
-                                            {device.type === 'tableau' ? 'Tableau interactif' :
-                                                device.type === 'climatisation' ? 'Système de climatisation' : 'Appareil'}
-                                        </Card.Subtitle>
-                                        <div className="device-details">
-                                            <p><i className="bi bi-geo-alt"></i> {device.location}</p>
-                                            <p><i className="bi bi-clock-history"></i> {device.lastUsed}</p>
-                                        </div>
-                                    </Card.Body>
-                                    <Card.Footer className="bg-transparent"> {/* 
-                                        <Button variant="primary" size="sm" className="me-2">
-                                            Contrôler
-                                        </Button> */}
-                                        {isLoggedIn && (userLevel === 'complexe' || userLevel === 'admin') && (
-                                            <>
-                                                <Button
-                                                    variant="outline-warning"
-                                                    size="sm"
-                                                    className="me-2"
-                                                    onClick={() => handleDeviceEdit(device)}
-                                                >
-                                                    <FaEdit />
-                                                </Button>
-                                                <Button
-                                                    variant="outline-danger"
-                                                    size="sm"
-                                                    onClick={() => handleDeviceDelete(device.id)}
-                                                >
-                                                    <FaTrash />
-                                                </Button>
-                                            </>
-                                        )}
-                                    </Card.Footer>
-                                </Card>
-                            </Col>
-                        ))}
-                    </Row>
-                </section>
 
                 {/* Section Utilisateurs (visible seulement pour les admins) */}
                 {isLoggedIn && userLevel === 'admin' && (
