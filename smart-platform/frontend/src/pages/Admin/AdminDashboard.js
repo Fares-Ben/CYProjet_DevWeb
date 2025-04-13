@@ -65,7 +65,6 @@ const AdminDashboard = () => {
     const [dashboardData, setDashboardData] = useState({
         users: [],
         pendingUsers: [],
-        classes: [],
         devices: [],
         announcements: [],
         events: [],
@@ -75,7 +74,7 @@ const AdminDashboard = () => {
             activeDevices: 0,
             inactiveDevices: 0,
             maintenanceDevices: 0,
-            totalClasses: 0,
+            totalEvents: 0,
             pendingRequests: 0,
             energyConsumption: 0,
             waterConsumption: 0,
@@ -156,7 +155,6 @@ const AdminDashboard = () => {
             const [
                 usersRes,
                 pendingRes,
-                classesRes,
                 devicesRes,
                 announcementsRes,
                 eventsRes,
@@ -165,7 +163,6 @@ const AdminDashboard = () => {
             ] = await Promise.all([
                 axios.get(`${API_BASE_URL}/admin/users`, { headers }),
                 axios.get(`${API_BASE_URL}/admin/pending-users`, { headers }),
-                axios.get(`${API_BASE_URL}/classes`, { headers }),
                 axios.get(`${API_BASE_URL}/smart-devices`, { headers }),
                 axios.get(`${API_BASE_URL}/announcements`, { headers }),
                 axios.get(`${API_BASE_URL}/events`, { headers }),
@@ -176,7 +173,6 @@ const AdminDashboard = () => {
             setDashboardData({
                 users: usersRes.data,
                 pendingUsers: pendingRes.data,
-                classes: classesRes.data,
                 devices: devicesRes.data,
                 announcements: announcementsRes.data,
                 events: eventsRes.data,
@@ -185,7 +181,7 @@ const AdminDashboard = () => {
                     activeDevices: devicesRes.data.filter(d => d.etat === 'actif').length,
                     inactiveDevices: devicesRes.data.filter(d => d.etat === 'inactif').length,
                     maintenanceDevices: devicesRes.data.filter(d => d.etat === 'maintenance').length,
-                    totalClasses: classesRes.data.length,
+                    totalEvents: eventsRes.data.length,
                     pendingRequests: pendingRes.data.length,
                     totalUsers: usersRes.data.length
                 },
@@ -626,12 +622,6 @@ const AdminDashboard = () => {
                             </Nav.Link>
                         </Nav.Item>
                         <Nav.Item>
-                            <Nav.Link eventKey="classes">
-                                <FaChalkboardTeacher className="me-2" />
-                                Classes
-                            </Nav.Link>
-                        </Nav.Item>
-                        <Nav.Item>
                             <Nav.Link eventKey="announcements">
                                 <FaRegBell className="me-2" />
                                 Annonces
@@ -724,12 +714,12 @@ const AdminDashboard = () => {
                                         <div className="stat-icon">
                                             <FaChalkboardTeacher />
                                         </div>
-                                        <Card.Title>Classes</Card.Title>
-                                        <div className="stat-value">{dashboardData.stats.totalClasses}</div>
+                                        <Card.Title>Événements</Card.Title>
+                                        <div className="stat-value">{dashboardData.stats.totalEvents}</div>
                                     </Card.Body>
                                     <Card.Footer>
-                                        <Button variant="link" onClick={() => setActiveTab('classes')}>
-                                            Voir les classes
+                                        <Button variant="link" onClick={() => setActiveTab('events')}>
+                                            Voir les événements
                                         </Button>
                                     </Card.Footer>
                                 </Card>
@@ -1438,54 +1428,6 @@ const AdminDashboard = () => {
                                         </Card.Body>
                                     </Card>
                                 </Col>
-                            </Row>
-                        </div>
-                    )}
-
-                    {/* Classes Tab */}
-                    {activeTab === 'classes' && (
-                        <div className="classes-content">
-                            <div className="d-flex justify-content-between align-items-center mb-4">
-                                <h2 className="admin-title">Gestion des classes</h2>
-                                <Button variant="primary" onClick={() => navigate('/admin/addClass')}>
-                                    <FaPlus className="me-2" />
-                                    Ajouter une classe
-                                </Button>
-                            </div>
-
-                            <Row>
-                                {dashboardData.classes.map(classe => (
-                                    <Col key={classe.id} md={4} className="mb-4">
-                                        <Card className="h-100">
-                                            <Card.Body>
-                                                <Card.Title>{classe.name}</Card.Title>
-                                                <Card.Subtitle className="mb-2 text-muted">
-                                                    Professeur: {classe.teacherName || 'Non assigné'}
-                                                </Card.Subtitle>
-                                                <div className="class-stats">
-                                                    <div className="stat-item">
-                                                        <span className="stat-label">Élèves:</span>
-                                                        <span className="stat-value">{classe.studentCount || 0}</span>
-                                                    </div>
-                                                    <div className="stat-item">
-                                                        <span className="stat-label">Appareils:</span>
-                                                        <span className="stat-value">
-                                                            {dashboardData.devices.filter(d => d.location.includes(classe.name)).length}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </Card.Body>
-                                            <Card.Footer className="bg-transparent">
-                                                <Button variant="outline-primary" size="sm" className="me-2">
-                                                    <FaEdit /> Modifier
-                                                </Button>
-                                                <Button variant="outline-danger" size="sm">
-                                                    <FaTrash /> Supprimer
-                                                </Button>
-                                            </Card.Footer>
-                                        </Card>
-                                    </Col>
-                                ))}
                             </Row>
                         </div>
                     )}

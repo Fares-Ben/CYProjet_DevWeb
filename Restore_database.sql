@@ -64,11 +64,13 @@ CREATE TABLE objects_activity (
 -- Table announcements
 CREATE TABLE announcements (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  title VARCHAR(100) NOT NULL,
+  title VARCHAR(255) NOT NULL,
   content TEXT NOT NULL,
-  author_id INT NOT NULL,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  priority ENUM('low', 'medium', 'high') NOT NULL DEFAULT 'medium'
+  urgent BOOLEAN DEFAULT FALSE,
+  date DATE NOT NULL,
+  author VARCHAR(100) NOT NULL,
+  created_by INT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Table events
@@ -100,16 +102,67 @@ VALUES
   ('Badgeuse Personnel', 'badgeuse', 'Entrée profs', 'actif', NULL, NULL);
 
 -- Announcements
-INSERT INTO announcements (title, content, author_id, priority)
-VALUES
-  ('Mise à jour importante', 'La maintenance du réseau est prévue pour ce week-end.', 4, 'high'),
-  ('Cours annulés', 'Les cours de demain sont annulés en raison des intempéries.', 3, 'medium');
+INSERT INTO announcements (title, content, urgent, date, author, created_by)
+VALUES 
+('Réunion pédagogique', 'Une réunion est prévue jeudi à 14h en salle B.', FALSE, '2025-04-14', 'Admin', 1),
+('Incendie simulé', 'Un exercice incendie aura lieu lundi matin à 10h.', TRUE, '2025-04-15', 'Admin', 1),
+('Nouveau matériel disponible', 'Des ordinateurs portables sont disponibles en salle 204.', FALSE, '2025-04-13', 'Admin', 1);
+
 
 -- Events
-INSERT INTO events (title, date, location)
+INSERT INTO events (title, description, date, start_time, end_time, location, participants, created_by)
 VALUES
-  ('Réunion de rentrée', '2025-09-01', 'Salle des profs'),
-  ('Fête de lécole', '2025-06-15', 'Cour principale');
+(
+  'Réunion Parents-Profs',
+  'Une réunion pour discuter des progrès des élèves.',
+  '2025-04-15',
+  '17:00:00',
+  '19:00:00',
+  'Salle 101',
+  'Parents, Enseignants',
+  1
+),
+(
+  'Journée Sportive',
+  'Tournoi interclasses avec plusieurs sports.',
+  '2025-04-20',
+  '09:00:00',
+  '16:00:00',
+  'Terrain principal',
+  'Tous',
+  2
+),
+(
+  'Conférence IA & Éducation',
+  'Présentation des dernières avancées en intelligence artificielle appliquées à l\'éducation.',
+  '2025-04-22',
+  '14:00:00',
+  '16:00:00',
+  'Amphi A',
+  'Professeurs',
+  3
+),
+(
+  'Atelier Écologie',
+  'Activité pratique pour sensibiliser les élèves à l\'environnement.',
+  '2025-04-25',
+  '10:00:00',
+  '12:00:00',
+  'Jardin scolaire',
+  'Élèves',
+  1
+),
+(
+  'Spectacle de fin d\'année',
+  'Spectacle préparé par les élèves de toutes les classes.',
+  '2025-06-15',
+  '18:30:00',
+  '21:00:00',
+  'Salle des fêtes',
+  'Tous',
+  4
+);
+
 
 -- Ajout des activités des utilisateurs
 INSERT INTO users_activity (ID_user_changeur, ID_user_modified, type, ancienne_donnee, nouvelle_donnee, date)
