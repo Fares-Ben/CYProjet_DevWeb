@@ -898,7 +898,7 @@ app.get('/api/admin/generate-report', async (req, res) => {
       if (type === 'energy') {
         
         const [rows] = await db.promise().query('SELECT SUM(consommation) as consoTotale, COUNT(*) as count FROM smart_devices');
-        const [conso] = await db.promise().query('SELECT name, consommation FROM smart_devices GROUP BY name HAVING consommation IS NOT NULL ORDER BY consommation DESC LIMIT 1');
+        const [conso] = await db.promise().query('SELECT name, consommation FROM smart_devices GROUP BY name ORDER BY consommation DESC LIMIT 1');
         
         const tot = rows[0].consoTotale;
         const nb = rows[0].count;
@@ -924,7 +924,7 @@ app.get('/api/admin/generate-report', async (req, res) => {
       } else if (type === 'users'){
         
         const [rows] = await db.promise().query('SELECT COUNT(*) as count FROM smart_devices');
-        const [act] = await db.promise().query('SELECT nom, prenom, nb_actions FROM users GROUP BY nom HAVING nb_actions IS NOT NULL ORDER BY nb_actions DESC LIMIT 1');
+        const [act] = await db.promise().query('SELECT nom, prenom, nb_actions FROM users GROUP BY nom ORDER BY nb_actions DESC LIMIT 1');
         
         const tot = rows[0].consoTotale;
         const nb = rows[0].count;
@@ -950,7 +950,7 @@ app.get('/api/admin/generate-report', async (req, res) => {
       } else {
         
         const [rows] = await db.promise().query('SELECT COUNT(*) as count FROM smart_devices');
-        const [act] = await db.promise().query('SELECT name, Date_derniere_activite FROM smart_devices GROUP BY name HAVING Date_derniere_activite IS NOT NULL ORDER BY Date_derniere_activite DESC LIMIT 1');
+        const [act] = await db.promise().query('SELECT name, Date_derniere_activite FROM smart_devices GROUP BY name ORDER BY Date_derniere_activite DESC LIMIT 1');
         
         const nb = rows[0].count;
         const max = act[0].name;
