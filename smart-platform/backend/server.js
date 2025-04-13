@@ -1,198 +1,210 @@
+require('dotenv').config();
 const express = require('express');
-const router = require('express').Router();
-const mysql = require('mysql2');
+const mysql = require('mysql2/promise');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const app = express();
-const port = 3001;
+const nodemailer = require('nodemailer');
+const { format } = require('date-fns-tz');
+const crypto = require('crypto');
 
+const app = express();
+const port = process.env.PORT || 3001;
+
+// Configuration middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Charger les variables d'environnement
-require('dotenv').config();
-
-const SECRET_KEY = process.env.SECRET_KEY;
-const DB_HOST = process.env.DB_HOST;
-const DB_USER = process.env.DB_USER;
-const DB_PASSWORD = process.env.DB_PASSWORD;
-const DB_NAME = process.env.DB_NAME;
-
-// Connexion à la base de données
-const db = mysql.createPool({
-  host: DB_HOST,
-  user: DB_USER,
-  password: DB_PASSWORD,
-  database: DB_NAME,
+// Configuration de la base de données
+const dbConfig = {
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
   waitForConnections: true,
   connectionLimit: 15,
   queueLimit: 0,
-});
+};
 
-const convertValidatedToBoolean = (userData) => ({
-  ...userData,
-  validated: userData.validated === 1
-});
+const pool = mysql.createPool(dbConfig);
 
-function toFrenchDateTime(date) {
-  return format(date, 'yyyy-MM-dd HH:mm:ss', { timeZone: 'Europe/Paris' });
-}
+// Vérification de la connexion à la base de données
+pool.getConnection()
+  .then(connection => {
+    console.log('Connexion à la base de données réussie 🎉');
+    connection.release();
+  })
+  .catch(err => {
+    console.error('Erreur de connexion à la base de données:', err);
+    process.exit(1);
+  });
 
-db.getConnection((err, connection) => {
-  if (err) {
-    console.error('Erreur de connexion à la base :', err);
-  } else {
-    console.log('Connexion à la base OK 🎉');
-    connection.release(); // Toujours libérer après usage
+// Configuration de l'email
+const transporter = nodemailer.createTransport({
+  service: process.env.EMAIL_SERVICE || 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
   }
 });
 
-const { format } = require('date-fns-tz');
-
-function getFrenchDateTime() {
+// Utilitaires
+const getFrenchDateTime = () => {
   return format(new Date(), 'yyyy-MM-dd HH:mm:ss', {
     timeZone: 'Europe/Paris'
   });
-}
+};
 
-/* ************************* */
-/* MIDDLEWARES D'AUTHENTIFICATION */
-/* ************************* */
+const formatDateForDB = (dateValue) => {
+  if (!dateValue) return null;
+  if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) return dateValue;
+  const date = new Date(dateValue);
+  return isNaN(date.getTime()) ? null : date.toISOString().split('T')[0];
+};
 
-// Middleware modifié
+// Middleware d'authentification
 const authenticateToken = async (req, res, next) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.sendStatus(401);
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Token manquant' });
+  }
 
   try {
-    const decoded = jwt.verify(token, SECRET_KEY);
-    // Requête SQL pour récupérer les données fraîches
-    const [rows] = await db.promise().query(
-      'SELECT id, pseudo, niveau FROM users WHERE id = ?',
+    const decoded = jwt.verify(token, process.env.SECRET_KEY);
+
+    const [users] = await pool.query(
+      'SELECT id, pseudo, niveau, fonction FROM users WHERE id = ?',
       [decoded.id]
     );
 
+    if (users.length === 0) {
+      return res.status(403).json({ error: 'Utilisateur non trouvé' });
+    }
 
-
-    if (!rows[0]) return res.sendStatus(403);
-    req.user = rows[0]; // Injecte les données utilisateur
+    req.user = users[0];
     next();
   } catch (err) {
-    console.error('Token error:', err);
-    res.sendStatus(403);
+    console.error('Erreur de token:', err);
+
+    if (err.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'Token expiré' });
+    }
+
+    return res.status(403).json({ error: 'Token invalide' });
   }
 };
-// Endpoint /api/protected modifié
-app.get('/api/protected', authenticateToken, (req, res) => {
-  res.json({
-    message: 'Accès autorisé',
-    user: req.user // Contient { id, pseudo, niveau }
-  });
-});
 
-app.post('/api/login', async (req, res) => {
-  const { pseudo, password } = req.body;
-
-  try {
-    // Vérification utilisateur
-    const [users] = await db.promise().query(
-      'SELECT * FROM users WHERE pseudo = ?',
-      [pseudo]
-    );
-
-    if (!users.length) return res.status(401).json({ error: 'Utilisateur introuvable' });
-    if (users[0].email_verified === 0) return res.status(401).json({ error: 'Veuiller valider votre adresse email afin de vous connecter.' });
-
-
-    const user = users[0];
-    const valid = await bcrypt.compare(password, user.password);
-    if (!valid) return res.status(401).json({ error: 'Mot de passe incorrect' });
-
-    const frenchDate = toFrenchDateTime(new Date());
-    // MAJ derniere connexion
-    await db.promise().query(
-      'UPDATE users SET last_connexion = ? WHERE id = ?',
-      [frenchDate, user.id]
-    );
-
-    // Réponse
-    const token = jwt.sign({
-      id: user.id,
-      pseudo: user.pseudo,
-      niveau: user.niveau,
-      fonction: user.fonction
-    }, SECRET_KEY, { expiresIn: '1h' });
-
-    res.json({
-      token,
-      user: {
-        ...user,
-        last_connexion: frenchDate
-      }
-    });
-
-  } catch (err) {
-    console.error('Erreur complète:', err);
-    res.status(500).json({
-      error: 'Erreur serveur',
-      details: process.env.NODE_ENV === 'development' ? err.message : undefined
-    });
-  }
-});
-
+// Middleware pour vérifier les droits admin
 const isAdmin = (req, res, next) => {
-  // On suppose que le niveau est stocké dans le token
-  // Si ce n'est pas le cas, il faudra faire une requête à la BDD
   if (req.user.niveau !== 'admin') {
     return res.status(403).json({ error: 'Accès refusé - Admin requis' });
   }
   next();
 };
 
-/* ************************* */
-/* ROUTES PUBLIQUES */
-/* ************************* */
-
-app.get('/api/classes', (req, res) => {
-  db.query('SELECT * FROM classes', (err, results) => {
-    if (err) return res.status(500).json(err);
-    res.json(results);
-  });
+// Routes publiques
+app.get('/api/classes', async (req, res) => {
+  try {
+    const [classes] = await pool.query('SELECT * FROM classes');
+    res.json(classes);
+  } catch (err) {
+    console.error('Erreur:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
 });
 
-app.get('/api/announcements', (req, res) => {
-  db.query('SELECT * FROM announcements', (err, results) => {
-    if (err) return res.status(500).json(err);
-    res.json(results);
-  });
+app.get('/api/announcements', async (req, res) => {
+  try {
+    const [announcements] = await pool.query('SELECT * FROM announcements ORDER BY date DESC');
+    res.json(announcements);
+  } catch (err) {
+    console.error('Erreur:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
 });
 
-app.get('/api/events', (req, res) => {
-  db.query('SELECT * FROM events', (err, results) => {
-    if (err) return res.status(500).json(err);
-    res.json(results);
-  });
+app.get('/api/events', async (req, res) => {
+  try {
+    const [events] = await pool.query('SELECT * FROM events ORDER BY date DESC');
+    res.json(events);
+  } catch (err) {
+    console.error('Erreur:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
 });
 
-app.get('/api/smart-devices', (req, res) => {
-  db.query('SELECT * FROM smart_devices', (err, results) => {
-    if (err) return res.status(500).json(err);
-    res.json(results);
-  });
+app.get('/api/smart-devices', async (req, res) => {
+  try {
+    const [devices] = await pool.query('SELECT * FROM smart_devices');
+    res.json(devices);
+  } catch (err) {
+    console.error('Erreur:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
 });
 
+// Authentification
+app.post('/api/login', async (req, res) => {
+  const { pseudo, password } = req.body;
 
-/* ************************* */
-/* ROUTES D'AUTHENTIFICATION */
-/* ************************* */
+  if (!pseudo || !password) {
+    return res.status(400).json({ error: 'Pseudo et mot de passe requis' });
+  }
 
-/* ************************* */
-/* ROUTES PROTÉGÉES */
-/* ************************* */
+  try {
+    const [users] = await pool.query(
+      'SELECT * FROM users WHERE pseudo = ?',
+      [pseudo]
+    );
 
-// Route test pour vérifier l'authentification
+    if (!users.length) {
+      return res.status(401).json({ error: 'Identifiants incorrects' });
+    }
+
+    const user = users[0];
+
+    if (user.email_verified === 0) {
+      return res.status(401).json({ error: 'Veuillez valider votre email avant de vous connecter' });
+    }
+
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) {
+      return res.status(401).json({ error: 'Identifiants incorrects' });
+    }
+
+    const frenchDate = getFrenchDateTime();
+    await pool.query(
+      'UPDATE users SET last_connexion = ? WHERE id = ?',
+      [frenchDate, user.id]
+    );
+
+    const token = jwt.sign({
+      id: user.id,
+      pseudo: user.pseudo,
+      niveau: user.niveau,
+      fonction: user.fonction
+    }, process.env.SECRET_KEY, { expiresIn: '8h' });
+
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        pseudo: user.pseudo,
+        niveau: user.niveau,
+        fonction: user.fonction,
+        last_connexion: frenchDate
+      }
+    });
+  } catch (err) {
+    console.error('Erreur:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Routes protégées
 app.get('/api/protected', authenticateToken, (req, res) => {
   res.json({
     message: 'Accès autorisé',
@@ -200,222 +212,110 @@ app.get('/api/protected', authenticateToken, (req, res) => {
   });
 });
 
-// Routes admin - nécessitent à la fois authenticateToken et isAdmin
-app.get('/api/admin/users', authenticateToken, isAdmin, (req, res) => {
-  db.query('SELECT * FROM users WHERE validated = 1', (err, results) => {
-    if (err) return res.status(500).json(err);
-    res.json(results);
-  });
-});
-
-app.get('/api/admin/classes', authenticateToken, isAdmin, (req, res) => {
-  db.query('SELECT * FROM classes', (err, results) => {
-    if (err) return res.status(500).json(err);
-    res.json(results);
-  });
-});
-app.get('/api/admin/announcements', authenticateToken, isAdmin, (req, res) => {
-  db.query('SELECT * FROM announcements', (err, results) => {
-    if (err) return res.status(500).json(err);
-    res.json(results);
-  });
-});
-app.get('/api/admin/smart_devices', authenticateToken, isAdmin, (req, res) => {
-  db.query('SELECT * FROM smart_devices', (err, results) => {
-    if (err) return res.status(500).json(err);
-    res.json(results);
-  });
-});
-
-
-app.get('/api/admin/stats', authenticateToken, isAdmin, async (req, res) => {
+// Routes admin
+app.get('/api/admin/users', authenticateToken, isAdmin, async (req, res) => {
   try {
-    const [users] = await db.promise().query('SELECT COUNT(*) AS totalUsers FROM users');
-    const [admins] = await db.promise().query('SELECT COUNT(*) AS totalAdmins FROM users WHERE niveau = "admin"');
-
-    res.json({
-      totalUsers: users[0].totalUsers,
-      totalAdmins: admins[0].totalAdmins,
-      // totalMessages: 0,
-      // reportedMessages: 0,
-      // totalReports: 0,
-    });
+    const [users] = await pool.query('SELECT * FROM users WHERE validated = 1');
+    res.json(users);
   } catch (err) {
-    res.status(500).json(err);
+    console.error('Erreur:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
-// Endpoint pour valider un utilisateur
-app.post('/api/validate-email/:id', async (req, res) => {
-  const { id } = req.params;  // Récupération de l'ID à partir des paramètres de l'URL
-
+app.get('/api/admin/pending-users', authenticateToken, isAdmin, async (req, res) => {
   try {
-
-    // Commence par effectuer les requêtes de mise à jour et attends qu'elles se terminent
-    await db.promise().query('UPDATE users SET email_verified = 1 WHERE id = ?', [id]);
-
-    await db.promise().query('UPDATE users SET validation_token = null WHERE id = ?', [id]);
-    await db.promise().query('UPDATE users SET token_expiration = null WHERE id = ?', [id]);
-    // 3. Enregistrement dans l'historique
-    await db.promise().query(
-      `INSERT INTO Users_activity 
-      (ID_user_changeur, ID_user_modified, type, ancienne_donnee, nouvelle_donnee, date) 
-      VALUES ('0', ?, 'VALIDATION EMAIL', ?, ?, NOW())`,
-      [req.params.id, 0, 1]
-    );
-
-    // Une fois toutes les requêtes terminées, envoie une réponse au client
-    res.status(200).json({ message: 'L\'email a été validé avec succès.' });
+    const [users] = await pool.query('SELECT * FROM users WHERE validated = 0');
+    res.json(users);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: 'Erreur de validation demail',
-      details: process.env.NODE_ENV === 'development' ? err.message : undefined
-    });
+    console.error('Erreur:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
-
-app.get('/api/admin/events', authenticateToken, isAdmin, (req, res) => {
-  db.query('SELECT * FROM events', (err, results) => {
-    if (err) return res.status(500).json(err);
-    res.json(results);
-  });
-});
-
-app.get('/api/admin/pending-users', authenticateToken, isAdmin, (req, res) => {
-  db.query('SELECT * FROM users WHERE validated = FALSE', (err, results) => {
-    if (err) return res.status(500).json(err);
-    res.json(results);
-  });
-});
-
-// Endpoint pour valider un utilisateur
 app.post('/api/admin/validate-user/:id', authenticateToken, isAdmin, async (req, res) => {
   try {
+    const userId = req.params.id;
 
-    db.query('UPDATE users SET validated = 1 WHERE id = ?',
-      [req.params.id]
+    await pool.query('BEGIN');
+
+    await pool.query(
+      'UPDATE users SET validated = 1 WHERE id = ?',
+      [userId]
     );
 
-    // 3. Enregistrement dans l'historique
-    await db.promise().query(
+    await pool.query(
+      'UPDATE users SET points = points + 1 WHERE id = ?',
+      [userId]
+    );
+
+    await pool.query(
       `INSERT INTO Users_activity 
       (ID_user_changeur, ID_user_modified, type, ancienne_donnee, nouvelle_donnee, date) 
       VALUES (?, ?, 'VALIDATION USER', ?, ?, NOW())`,
-      [req.user.id, req.params.id, 0, 1]
+      [req.user.id, userId, 0, 1]
     );
 
-    await db.promise().query(
-      'UPDATE users SET points = points + 1 WHERE id = ?',
-      [req.params.id]
-    );
+    await pool.query('COMMIT');
 
     res.json({
-      message: 'Validation réussie',
-      deletedId: req.params.id
+      message: 'Utilisateur validé avec succès',
+      userId
     });
-
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: 'Erreur de validation',
-      details: process.env.NODE_ENV === 'development' ? err.message : undefined
-    });
+    await pool.query('ROLLBACK');
+    console.error('Erreur:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
-// DELETE /api/admin/users/:id
 app.delete('/api/admin/delete-user/:id', authenticateToken, isAdmin, async (req, res) => {
   try {
+    const userId = req.params.id;
 
-    db.query(
+    await pool.query('BEGIN');
+
+    await pool.query(
       'DELETE FROM users WHERE id = ?',
-      [req.params.id]
+      [userId]
     );
 
-
-    // 3. Enregistrement dans l'historique
-    await db.promise().query(
+    await pool.query(
       `INSERT INTO Users_activity 
       (ID_user_changeur, ID_user_modified, type, ancienne_donnee, nouvelle_donnee, date) 
       VALUES (?, ?, 'SUPPRESSION UTILISATEUR', 'Existait', 'Existe plus', NOW())`,
-      [req.user.id, req.params.id]
+      [req.user.id, userId]
     );
+
+    await pool.query('COMMIT');
 
     res.json({
-      message: 'Suppression réussie',
-      deletedId: req.params.id
+      message: 'Utilisateur supprimé avec succès',
+      userId
     });
-
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: 'Erreur de suppression',
-      details: process.env.NODE_ENV === 'development' ? err.message : undefined
-    });
-  }
-});
-
-app.post('/api/admin/update_password/:id', authenticateToken, isAdmin, async (req, res) => {
-  const userId = req.params.id;
-  const { newPassword } = req.body;
-
-  if (!newPassword) {
-    return res.status(400).json({ error: 'Le nouveau mot de passe est requis.' });
-  }
-
-  try {
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-    db.query(
-      'UPDATE users SET password = ? WHERE id = ?',
-      [hashedPassword, userId],
-      (err, result) => {
-        if (err) {
-          return res.status(500).json({ error: 'Erreur lors de la mise à jour du mot de passe.' });
-        }
-
-        // Vérifie si un utilisateur a été modifié
-        if (result.affectedRows === 0) {
-          return res.status(404).json({ error: 'Utilisateur non trouvé.' });
-        }
-
-        res.json({ message: 'Mot de passe mis à jour avec succès.' });
-      }
-    );
-    // 3. Enregistrement dans l'historique
-    await db.promise().query(
-      `INSERT INTO Users_activity 
-          (ID_user_changeur, ID_user_modified, type, ancienne_donnee, nouvelle_donnee, date) 
-          VALUES (?, ?, 'CHANGEMENT MOT DE PASSE', 'MDP haché (inconnu)', 'nouveau MDP Haché (inconnu)', NOW())`,
-      [req.user.id, req.params.id]
-    );
-
-  } catch (err) {
-    res.status(500).json({ error: 'Erreur lors du hachage du mot de passe.' });
+    await pool.query('ROLLBACK');
+    console.error('Erreur:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
 app.put('/api/admin/users/:id', authenticateToken, isAdmin, async (req, res) => {
   const { id } = req.params;
-  const connection = await db.promise().getConnection(); // Obtenez une connexion
-
-  const formatDateForDB = (dateValue) => {
-    if (!dateValue) return null;
-    if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) return dateValue;
-    const date = new Date(dateValue);
-    return isNaN(date.getTime()) ? null : date.toISOString().split('T')[0];
-  };
+  const connection = await pool.getConnection();
 
   try {
     await connection.beginTransaction();
 
     // Récupération anciennes valeurs
     const [user] = await connection.query('SELECT * FROM users WHERE id = ?', [id]);
+    if (user.length === 0) {
+      return res.status(404).json({ error: 'Utilisateur non trouvé' });
+    }
+
     const anciennesValeurs = user[0];
 
-    // Préparation des champs à mettre à jour
+    // Champs à mettre à jour
     const champs = [
       { nom: 'niveau', libelle: 'NIVEAU' },
       { nom: 'pseudo', libelle: 'PSEUDO' },
@@ -428,43 +328,37 @@ app.put('/api/admin/users/:id', authenticateToken, isAdmin, async (req, res) => 
       { nom: 'date_naissance', libelle: 'DATE DE NAISSANCE' }
     ];
 
-    // Traitement des modifications
     const modifications = [];
 
     for (const champ of champs) {
-      const nouvelleValeur = champ.nom === 'date_naissance'
-        ? formatDateForDB(req.body[champ.nom])
-        : req.body[champ.nom];
+      if (req.body[champ.nom] !== undefined) {
+        const nouvelleValeur = champ.nom === 'date_naissance'
+          ? formatDateForDB(req.body[champ.nom])
+          : req.body[champ.nom];
 
-      const ancienneValeur = champ.nom === 'date_naissance'
-        ? formatDateForDB(anciennesValeurs[champ.nom])
-        : anciennesValeurs[champ.nom];
+        const ancienneValeur = anciennesValeurs[champ.nom];
 
-      if (ancienneValeur !== nouvelleValeur) {
+        if (ancienneValeur !== nouvelleValeur) {
+          await connection.query(
+            `UPDATE users SET ${champ.nom} = ? WHERE id = ?`,
+            [nouvelleValeur, id]
+          );
 
-        // Mise à jour du champ
-        await connection.query(
-          `UPDATE users SET ${champ.nom} = ? WHERE id = ?`,
-          [nouvelleValeur, id]
-        );
+          await connection.query(
+            `INSERT INTO Users_activity 
+             (ID_user_changeur, ID_user_modified, type, ancienne_donnee, nouvelle_donnee, date)
+             VALUES (?, ?, ?, ?, ?, NOW())`,
+            [
+              req.user.id,
+              id,
+              `MODIFICATION ${champ.libelle}`,
+              ancienneValeur,
+              nouvelleValeur
+            ]
+          );
 
-        // Enregistrement dans l'historique
-        await connection.query(
-          `INSERT INTO Users_activity 
-           (ID_user_changeur, ID_user_modified, type, ancienne_donnee, nouvelle_donnee, date)
-           VALUES (?, ?, ?, ?, ?, NOW())`,
-          [
-            req.user.id,
-            id,
-            `MODIFICATION ${champ.libelle}`,
-            champ.nom === 'date_naissance'
-              ? formatDateForDB(anciennesValeurs[champ.nom])
-              : anciennesValeurs[champ.nom],
-            nouvelleValeur
-          ]
-        );
-
-        modifications.push(champ.nom);
+          modifications.push(champ.nom);
+        }
       }
     }
 
@@ -477,192 +371,198 @@ app.put('/api/admin/users/:id', authenticateToken, isAdmin, async (req, res) => 
         : "Aucune modification nécessaire",
       modifiedFields: modifications
     });
-
   } catch (err) {
     await connection.rollback();
-    console.error("Erreur transaction:", err);
-    res.status(500).json({
-      error: "Échec des mises à jour",
-      details: err.message
-    });
+    console.error("Erreur:", err);
+    res.status(500).json({ error: "Erreur serveur" });
   } finally {
-    connection.release(); // Libération de la connexion
+    connection.release();
   }
 });
 
-const nodemailer = require('nodemailer');
-
-// Configuration du transporteur SMTP
-const transporter = nodemailer.createTransport({
-  service: 'gmail', // ou autre service
-  auth: {
-    user: process.env.EMAIL_USER, // à définir dans vos variables d'environnement
-    pass: process.env.EMAIL_PASS  // à définir dans vos variables d'environnement
-  }
-});
-
-app.post('/api/register', async (req, res) => {
-  const { email, password, niveau, fonction, date_naissance, prenom, nom } = req.body;
-
-  if (!email || !password || !niveau || !fonction || !date_naissance || !prenom || !nom) {
-    return res.status(400).json({ error: 'Tous les champs sont requis.' });
-  }
-
+// Gestion des appareils
+app.get('/api/admin/devices', authenticateToken, isAdmin, async (req, res) => {
   try {
-    // Vérifie si l'email existe déjà
-    const [existingUsers] = await db.promise().query(
-      'SELECT id FROM users WHERE email = ? ',
-      [email]
-    );
+    const [devices] = await pool.query('SELECT * FROM smart_devices');
+    res.json(devices);
+  } catch (err) {
+    console.error('Erreur:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
 
-    if (existingUsers.length > 0) {
-      return res.status(409).json({ error: 'Email déjà utilisé.' });
+app.post('/api/admin/devices', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const {
+      name, type, location, etat,
+      consommation
+    } = req.body;
+
+    if (!name || !type || !location) {
+      return res.status(400).json({ error: 'Nom, type et localisation sont requis' });
     }
 
-    // Construction du pseudo
-    const prenomInitiale = prenom.trim().toLowerCase().charAt(0);
-    const nomSanitized = nom.trim().toLowerCase().replace(/\s/g, '');
-    let basePseudo = fonction.toLowerCase() === 'eleve'
-      ? `e-${prenomInitiale}${nomSanitized}`
-      : fonction.toLowerCase() === 'personnel' ?
-        `pers-${prenomInitiale}${nomSanitized}` :
-        `prof-${prenomInitiale}${nomSanitized}`;
+    await pool.query('BEGIN');
 
-    // Cherche tous les pseudos similaires
-    const [similarPseudos] = await db.promise().query(
-      'SELECT pseudo FROM users WHERE pseudo LIKE ?',
-      [`${basePseudo}%`]
+    const [result] = await pool.query(`
+      INSERT INTO smart_devices 
+      (name, type, location, etat, consommation)
+      VALUES (?, ?, ?, ?, ?)
+    `, [name, type, location, etat || 'actif', consommation || 0]);
+
+    const deviceId = result.insertId;
+
+    await pool.query(
+      `INSERT INTO objects_activity 
+      (ID_user_changeur, ID_object_modified, type, ancienne_donnee, nouvelle_donnee, date) 
+      VALUES (?, ?, 'AJOUT APPAREIL', 'Nouvel appareil', ?, NOW())`,
+      [req.user.id, deviceId, name]
     );
 
-    let finalPseudo = basePseudo;
-    if (similarPseudos.length > 0) {
-      const usedNumbers = similarPseudos
-        .map(u => u.pseudo)
-        .map(p => {
-          const match = p.match(new RegExp(`^${basePseudo}(\\d+)$`));
-          return match ? parseInt(match[1], 10) : null;
-        })
-        .filter(n => n !== null);
-
-      const nextNumber = usedNumbers.length > 0 ? Math.max(...usedNumbers) + 1 : 1;
-      finalPseudo = `${basePseudo}${nextNumber}`;
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Génération d'un token de validation
-    const crypto = require('crypto');
-    const validationToken = crypto.randomBytes(20).toString('hex');
-    const tokenExpiration = new Date(Date.now() + 24 * 60 * 60 * 1000); // Expire dans 24h
-
-    const photo = null;
-    const points = 0;
-    const last_connexion = null;
-    const nb_connexions = 0;
-    const nb_actions = 0;
-    const email_verified = 0;
-    const validated = 0;
-    const theme_prefere = 'light';
-
-    await db.promise().query(
-      `INSERT INTO users 
-      (nom, prenom, date_naissance, fonction, email, password, pseudo, photo, niveau, points, last_connexion, nb_connexions, nb_actions, validated, validation_token, token_expiration, theme_prefere, email_verified)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        nom,
-        prenom,
-        date_naissance,
-        fonction,
-        email,
-        hashedPassword,
-        finalPseudo,
-        photo,
-        niveau,
-        points,
-        last_connexion,
-        nb_connexions,
-        nb_actions,
-        validated,
-        validationToken,
-        tokenExpiration,
-        theme_prefere,
-        email_verified
-      ]
-    );
-
-
-    // Envoi de l'email de confirmation
-    const confirmationLink = `${process.env.FRONTEND_URL}/validate-account?token=${validationToken}`;
-
-    const mailOptions = {
-      from: `"SmartEcole" <${process.env.EMAIL_FROM || 'no-reply@smartecole.com'}>`,
-      to: email,
-      subject: '🛎 Confirmation de votre inscription à SmartEcole',
-      html: `
-        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e1e1e1; border-radius: 8px; overflow: hidden;">
-          <!-- En-tête -->
-          <div style="background-color: #4a6fa5; padding: 20px; text-align: center;">
-            <h1 style="color: white; margin: 0;">Bienvenue sur SmartEcole !</h1>
-          </div>
-          
-          <!-- Corps du message -->
-          <div style="padding: 25px;">
-            <p style="font-size: 16px;">Bonjour,</p>            
-            <p style="font-size: 16px;">Merci d'avoir rejoint notre plateforme intelligente pour établissements scolaires. Pour activer votre compte, veuillez confirmer votre adresse email :</p>
-                        <p style="font-size: 16px;">Après validation, votre pseudo sera : ${finalPseudo}</p> </br>
-
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${confirmationLink}" 
-                 style="background-color: #4a6fa5; color: white; padding: 12px 24px; 
-                        text-decoration: none; border-radius: 4px; font-weight: bold;
-                        display: inline-block;">
-                Confirmer mon email
-              </a>
-            </div>
-            
-            <p style="font-size: 14px; color: #666;">
-              <strong>Note :</strong> Ce lien expirera dans 24 heures.<br>
-              Si le bouton ne fonctionne pas, copiez ce lien dans votre navigateur :<br>
-              <span style="word-break: break-all;">${confirmationLink}</span>
-            </p>
-          </div>
-          
-          <!-- Pied de page -->
-          <div style="background-color: #f5f5f5; padding: 15px; text-align: center; font-size: 12px; color: #666;">
-            <p style="margin: 0;">
-              Si vous n'avez pas demandé cette inscription, veuillez ignorer cet email.<br>
-              © ${new Date().getFullYear()} SmartEcole. Tous droits réservés.
-            </p>
-          </div>
-        </div>
-      `
-    };
-
-    await transporter.sendMail(mailOptions);
-    const [users] = await db.promise().query(
-      'SELECT id, token_expiration FROM users WHERE validation_token = ?',
-      [validationToken]
-    );
-
-    const user = users[0];
+    await pool.query('COMMIT');
 
     res.status(201).json({
-      message: 'Utilisateur enregistré avec succès. Un email de confirmation a été envoyé.',
-      token: validationToken,
-      email: email,
-      userID: user.id
+      message: 'Appareil créé avec succès',
+      deviceId
     });
-
-
   } catch (err) {
-    console.error('Erreur lors de l\'inscription :', err);
-    res.status(500).json({ error: 'Erreur interne du serveur.' });
+    await pool.query('ROLLBACK');
+    console.error('Erreur:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
+app.put('/api/admin/devices/:id', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const deviceId = req.params.id;
+    const {
+      name, type, location, etat,
+      consommation
+    } = req.body;
+
+    if (!name || !type || !location) {
+      return res.status(400).json({ error: 'Nom, type et localisation sont requis' });
+    }
+
+    await pool.query('BEGIN');
+
+    // Récupération anciennes valeurs
+    const [device] = await pool.query('SELECT * FROM smart_devices WHERE id = ?', [deviceId]);
+    if (device.length === 0) {
+      return res.status(404).json({ error: 'Appareil non trouvé' });
+    }
+
+    const ancienDevice = device[0];
+
+    await pool.query(`
+      UPDATE smart_devices SET 
+      name = ?, type = ?, location = ?, etat = ?, 
+      consommation = ?
+      WHERE id = ?
+    `, [name, type, location, etat, consommation, deviceId]);
+
+    // Enregistrement des modifications
+    const champs = ['name', 'type', 'location', 'etat', 'consommation'];
+    for (const champ of champs) {
+      if (req.body[champ] !== undefined && req.body[champ] !== ancienDevice[champ]) {
+        await pool.query(
+          `INSERT INTO objects_activity 
+          (ID_user_changeur, ID_object_modified, type, ancienne_donnee, nouvelle_donnee, date)
+          VALUES (?, ?, ?, ?, ?, NOW())`,
+          [
+            req.user.id,
+            deviceId,
+            `MODIFICATION ${champ.toUpperCase()}`,
+            ancienDevice[champ],
+            req.body[champ]
+          ]
+        );
+      }
+    }
+
+    await pool.query('COMMIT');
+
+    res.json({
+      message: 'Appareil mis à jour avec succès',
+      deviceId
+    });
+  } catch (err) {
+    await pool.query('ROLLBACK');
+    console.error('Erreur:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+app.delete('/api/admin/devices/:id', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const deviceId = req.params.id;
+
+    await pool.query('BEGIN');
+
+    const [device] = await pool.query('SELECT name FROM smart_devices WHERE id = ?', [deviceId]);
+    if (device.length === 0) {
+      return res.status(404).json({ error: 'Appareil non trouvé' });
+    }
+
+    await pool.query('DELETE FROM smart_devices WHERE id = ?', [deviceId]);
+
+    await pool.query(
+      `INSERT INTO objects_activity 
+      (ID_user_changeur, ID_object_modified, type, ancienne_donnee, nouvelle_donnee, date) 
+      VALUES (?, ?, 'SUPPRESSION APPAREIL', ?, 'Supprimé', NOW())`,
+      [req.user.id, deviceId, device[0].name]
+    );
+
+    await pool.query('COMMIT');
+
+    res.json({
+      message: 'Appareil supprimé avec succès',
+      deviceId
+    });
+  } catch (err) {
+    await pool.query('ROLLBACK');
+    console.error('Erreur:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Statistiques
+app.get('/api/admin/stats', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const [users] = await pool.query('SELECT COUNT(*) AS total FROM users');
+    const [activeDevices] = await pool.query('SELECT COUNT(*) AS total FROM smart_devices WHERE etat = "actif"');
+    const [inactiveDevices] = await pool.query('SELECT COUNT(*) AS total FROM smart_devices WHERE etat = "inactif"');
+    const [maintenanceDevices] = await pool.query('SELECT COUNT(*) AS total FROM smart_devices WHERE etat = "maintenance"');
+    const [classes] = await pool.query('SELECT COUNT(*) AS total FROM classes');
+    const [pendingUsers] = await pool.query('SELECT COUNT(*) AS total FROM users WHERE validated = 0');
+
+    res.json({
+      stats: {
+        totalUsers: users[0].total,
+        activeDevices: activeDevices[0].total,
+        inactiveDevices: inactiveDevices[0].total,
+        maintenanceDevices: maintenanceDevices[0].total,
+        totalClasses: classes[0].total,
+        pendingRequests: pendingUsers[0].total,
+        energyConsumption: 0, // À implémenter
+        waterConsumption: 0,  // À implémenter
+        monthlyComparison: {
+          energy: 0,
+          users: 0,
+          devices: 0
+        }
+      }
+    });
+  } catch (err) {
+    console.error('Erreur:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Activités
 app.get('/api/admin/users-activity', authenticateToken, isAdmin, async (req, res) => {
   try {
-    const [rows] = await db.promise().query(`
+    const [activities] = await pool.query(`
       SELECT 
         ua.ID_user_changeur AS userId,
         u.pseudo,
@@ -671,126 +571,233 @@ app.get('/api/admin/users-activity', authenticateToken, isAdmin, async (req, res
       FROM Users_activity ua
       JOIN users u ON u.id = ua.ID_user_changeur
       ORDER BY ua.date DESC
-      LIMIT 7
+      LIMIT 50
     `);
 
-    res.json(rows);
+    res.json(activities);
   } catch (err) {
-    console.error("Erreur lors de la récupération des activités :", err);
-    res.status(500).json({ error: 'Erreur lors de la récupération des activités' });
+    console.error('Erreur:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
-app.get('/api/validate-account', async (req, res) => {
-  const { token } = req.query;
+// Inscription
+app.post('/api/register', async (req, res) => {
+  const { email, password, niveau, fonction, date_naissance, prenom, nom } = req.body;
 
-  const [users] = await db.promise().query(
-    'SELECT id, token_expiration FROM users WHERE validation_token = ?',
-    [token]
-  );
-
-
-  if (!token) {
-    return res.status(400).json({ error: 'Token de validation manquant.' });
+  if (!email || !password || !niveau || !fonction || !date_naissance || !prenom || !nom) {
+    return res.status(400).json({ error: 'Tous les champs sont requis' });
   }
 
+  const connection = await pool.getConnection();
+
   try {
+    await connection.beginTransaction();
+
+    // Vérification email existant
+    const [existingUsers] = await connection.query(
+      'SELECT id FROM users WHERE email = ?',
+      [email]
+    );
+
+    if (existingUsers.length > 0) {
+      return res.status(409).json({ error: 'Email déjà utilisé' });
+    }
+
+    // Génération du pseudo
+    const prenomInitiale = prenom.trim().toLowerCase().charAt(0);
+    const nomSanitized = nom.trim().toLowerCase().replace(/\s/g, '');
+    let basePseudo = fonction.toLowerCase() === 'eleve'
+      ? `e-${prenomInitiale}${nomSanitized}`
+      : fonction.toLowerCase() === 'personnel'
+        ? `pers-${prenomInitiale}${nomSanitized}`
+        : `prof-${prenomInitiale}${nomSanitized}`;
+
+    const [similarPseudos] = await connection.query(
+      'SELECT pseudo FROM users WHERE pseudo LIKE ?',
+      [`${basePseudo}%`]
+    );
+
+    let finalPseudo = basePseudo;
+    if (similarPseudos.length > 0) {
+      const nextNumber = similarPseudos.length + 1;
+      finalPseudo = `${basePseudo}${nextNumber}`;
+    }
+
+    // Hachage mot de passe
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Génération token validation
+    const validationToken = crypto.randomBytes(20).toString('hex');
+    const tokenExpiration = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+
+    // Insertion utilisateur
+    const [result] = await connection.query(
+      `INSERT INTO users 
+      (nom, prenom, date_naissance, fonction, email, password, pseudo, niveau, 
+       points, validated, validation_token, token_expiration, email_verified)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        nom,
+        prenom,
+        formatDateForDB(date_naissance),
+        fonction,
+        email,
+        hashedPassword,
+        finalPseudo,
+        niveau,
+        0, // points
+        0, // validated
+        validationToken,
+        tokenExpiration,
+        0  // email_verified
+      ]
+    );
+
+    const userId = result.insertId;
+
+    // Envoi email confirmation
+    const confirmationLink = `${process.env.FRONTEND_URL}/validate-account?token=${validationToken}`;
+
+    await transporter.sendMail({
+      from: `"SmartEcole" <${process.env.EMAIL_FROM || 'no-reply@smartecole.com'}>`,
+      to: email,
+      subject: '🛎 Confirmation de votre inscription à SmartEcole',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e1e1e1; border-radius: 8px; overflow: hidden;">
+          <div style="background-color: #4a6fa5; padding: 20px; text-align: center; color: white;">
+            <h1 style="margin: 0;">Bienvenue sur SmartEcole !</h1>
+          </div>
+          <div style="padding: 25px;">
+            <p>Bonjour,</p>
+            <p>Merci d'avoir rejoint notre plateforme intelligente pour établissements scolaires.</p>
+            <p>Votre pseudo sera : <strong>${finalPseudo}</strong></p>
+            <p>Pour activer votre compte, veuillez confirmer votre adresse email :</p>
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${confirmationLink}" 
+                 style="background-color: #4a6fa5; color: white; padding: 12px 24px; 
+                        text-decoration: none; border-radius: 4px; font-weight: bold;
+                        display: inline-block;">
+                Confirmer mon email
+              </a>
+            </div>
+            <p style="font-size: 14px; color: #666;">
+              <strong>Note :</strong> Ce lien expirera dans 24 heures.<br>
+              Si le bouton ne fonctionne pas, copiez ce lien dans votre navigateur :<br>
+              <span style="word-break: break-all;">${confirmationLink}</span>
+            </p>
+          </div>
+          <div style="background-color: #f5f5f5; padding: 15px; text-align: center; font-size: 12px; color: #666;">
+            <p style="margin: 0;">
+              © ${new Date().getFullYear()} SmartEcole. Tous droits réservés.
+            </p>
+          </div>
+        </div>
+      `
+    });
+
+    await connection.commit();
+
+    res.status(201).json({
+      message: 'Inscription réussie. Un email de confirmation a été envoyé.',
+      userId,
+      pseudo: finalPseudo
+    });
+  } catch (err) {
+    await connection.rollback();
+    console.error('Erreur inscription:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  } finally {
+    connection.release();
+  }
+});
+
+// Validation email
+app.post('/api/validate-email/:token', async (req, res) => {
+  const { token } = req.params;
+
+  if (!token) {
+    return res.status(400).json({ error: 'Token requis' });
+  }
+
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [users] = await connection.query(
+      'SELECT id, token_expiration FROM users WHERE validation_token = ?',
+      [token]
+    );
 
     if (users.length === 0) {
-      return res.status(404).json({ error: 'Token invalide ou compte déjà validé.' });
+      return res.status(404).json({ error: 'Token invalide' });
     }
 
     const user = users[0];
     const now = new Date();
 
-
     if (new Date(user.token_expiration) < now) {
-
-      // Supprimer le compte expiré
-      await db.promise().query('DELETE FROM users WHERE id = ?', [user.id]);
-      return res.status(400).json({ error: 'Le token a expiré. Veuillez vous réinscrire.' });
-
+      await connection.query('DELETE FROM users WHERE id = ?', [user.id]);
+      return res.status(400).json({ error: 'Token expiré. Veuillez vous réinscrire.' });
     }
 
+    // Validation email
+    await connection.query(
+      'UPDATE users SET email_verified = 1, validation_token = NULL, token_expiration = NULL WHERE id = ?',
+      [user.id]
+    );
 
-    res.status(200).json({
-      message: 'Compte validé avec succès. Vous pouvez maintenant vous connecter.',
-      userID: user.id
+    // Enregistrement activité
+    await connection.query(
+      `INSERT INTO Users_activity 
+      (ID_user_changeur, ID_user_modified, type, ancienne_donnee, nouvelle_donnee, date) 
+      VALUES (0, ?, 'VALIDATION EMAIL', 0, 1, NOW())`,
+      [user.id]
+    );
+
+    await connection.commit();
+
+    res.json({
+      message: 'Email validé avec succès. Vous pouvez maintenant vous connecter.',
+      userId: user.id
     });
-
   } catch (err) {
-    console.error('Erreur lors de la validation du compte :', err);
-    res.status(500).json({ error: 'Erreur interne du serveur.' });
+    await connection.rollback();
+    console.error('Erreur validation email:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  } finally {
+    connection.release();
   }
 });
 
-app.get('/api/admin/classes-with-details', authenticateToken, isAdmin, (req, res) => {
-  db.query(`
-    SELECT c.*, u.pseudo as teacher_pseudo, u.nom as teacher_nom, u.prenom as teacher_prenom
-    FROM classes c
-    LEFT JOIN users u ON c.teacher_id = u.id
-  `, (err, results) => {
-    if (err) return res.status(500).json(err);
-    res.json(results);
-  });
-});
+// Profil utilisateur
+app.get('/api/profile', authenticateToken, async (req, res) => {
+  try {
+    const [users] = await pool.query(
+      `SELECT 
+        id, pseudo, nom, prenom, date_naissance, email, 
+        fonction, niveau, points, date_inscription, 
+        last_connexion, nb_connexions, nb_actions, theme_prefere
+      FROM users WHERE id = ?`,
+      [req.user.id]
+    );
 
-app.get('/api/admin/class-students/:classId', authenticateToken, isAdmin, (req, res) => {
-  db.query(`
-    SELECT u.id, u.pseudo, u.nom, u.prenom, u.age, u.photo
-    FROM users u
-    WHERE u.fonction = 'Eleve' AND u.class_id = ?
-  `, [req.params.classId], (err, results) => {
-    if (err) return res.status(500).json(err);
-    res.json(results);
-  });
-});
-app.get('/api/profiles', authenticateToken, (req, res) => {
-  const userId = req.user.id;
-  console.log('Tentative de récupération du profil pour user ID:', userId);
-  db.query(`
-    SELECT 
-      u.id, 
-      u.pseudo, 
-      u.nom, 
-      u.prenom, 
-      u.date_naissance, 
-      u.email, 
-      u.fonction, 
-      u.niveau, 
-      u.points, 
-      u.date_inscription, 
-      u.last_connexion,
-      u.nb_connexions,
-      u.nb_actions,
-      u.theme_prefere
-    FROM users u
-    WHERE u.id = ?
-  `, [userId], (err, results) => {
-    if (err) {
-      console.error('Erreur SQL:', err);
-      return res.status(500).json({
-        message: 'Erreur serveur',
-        error: err.message // Envoyer seulement le message d'erreur
-      });
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'Utilisateur non trouvé' });
     }
 
-    if (results.length === 0) {
-      console.log('Aucun utilisateur trouvé pour ID:', userId);
-      return res.status(404).json({ message: 'Utilisateur non trouvé' });
-    }
-
-    const user = results[0];
-    console.log('Profil trouvé:', user);
-    res.json(user);
-  });
+    res.json(users[0]);
+  } catch (err) {
+    console.error('Erreur:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
 });
 
-
-// ✅ Récupérer tous les appareils
-app.get('/api/admin/get-devices', authenticateToken, async (req, res) => {
-  const [rows] = await db.promise().query('SELECT * FROM smart_devices');
-  res.json(rows);
+// Gestion des erreurs
+app.use((err, req, res, next) => {
+  console.error('Erreur non gérée:', err);
+  res.status(500).json({ error: 'Erreur interne du serveur' });
 });
 
 // ✅ Créer un appareil
@@ -890,7 +897,7 @@ app.put('/api/profiles/:id', authenticateToken, (req, res) => {
   const { nom, prenom, email, pseudo } = req.body; // Récupérer les nouvelles données dans le corps de la requête
 
   console.log('Contenu reçu pour update yaaa :', req.body);
-        
+
   // Vérifier si l'utilisateur existe
   db.query('SELECT * FROM users WHERE id = ?', [userId], (err, result) => {
     if (err) {
@@ -918,7 +925,7 @@ app.put('/api/profiles/:id', authenticateToken, (req, res) => {
 
     db.query(
       'UPDATE users SET nom = ?, prenom = ?, email = ?, pseudo = ? WHERE id = ?',
-      [updatedUser.nom, updatedUser.prenom ,updatedUser.email, updatedUser.pseudo, userId],
+      [updatedUser.nom, updatedUser.prenom, updatedUser.email, updatedUser.pseudo, userId],
       (err, result) => {
         if (err) {
           return res.status(500).send('Erreur lors de la mise à jour des données');
@@ -939,5 +946,5 @@ app.put('/api/profiles/:id', authenticateToken, (req, res) => {
 /* ************************* */
 
 app.listen(port, () => {
-  console.log(`API disponible sur http://localhost:${port}`);
+  console.log(`Serveur démarré sur http://localhost:${port}`);
 });
