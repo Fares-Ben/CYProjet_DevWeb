@@ -58,6 +58,7 @@ const AdminDashboard = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [showConfirmAnnonceModal, setShowConfirmAnnonceModal] = useState(false);
     const [userToDelete, setUserToDelete] = useState(null);
     const [deviceSearchTerm, setDeviceSearchTerm] = useState('');
 
@@ -150,10 +151,11 @@ const AdminDashboard = () => {
         setShowAnnouncementModal(true);
     };
 
-    const handleDeleteClick = (announcementId) => {
+    const handleAnnonceDelete = (announcementId) => {
         setAnnouncementToDelete(announcementId);
-        setShowConfirmModal(true);
+        setShowConfirmAnnonceModal(true);
     };
+
 
     const formatRelativeTime = (dateString) => {
         const now = new Date();
@@ -194,7 +196,8 @@ const AdminDashboard = () => {
                 announcementsRes,
                 eventsRes,
                 statsRes,
-                activityRes
+                activityRes,
+                Object_activityRes
             ] = await Promise.all([
                 axios.get(`${API_BASE_URL}/admin/users`, { headers }),
                 axios.get(`${API_BASE_URL}/admin/pending-users`, { headers }),
@@ -202,9 +205,10 @@ const AdminDashboard = () => {
                 axios.get(`${API_BASE_URL}/announcements`, { headers }),
                 axios.get(`${API_BASE_URL}/events`, { headers }),
                 axios.get(`${API_BASE_URL}/admin/stats`, { headers }),
-                axios.get(`${API_BASE_URL}/admin/users-activity`, { headers })
+                axios.get(`${API_BASE_URL}/admin/users-activity`, { headers }),
+                axios.get(`${API_BASE_URL}/admin/object-activity`, { headers }),
             ]);
-
+            console.log('Reponse : ', Object_activityRes);
             setDashboardData({
                 users: usersRes.data,
                 pendingUsers: pendingRes.data,
@@ -226,7 +230,9 @@ const AdminDashboard = () => {
                         .filter(d => d.etat === 'actif')
                         .reduce((sum, d) => sum + (Number(d.consommation) || 0), 0)
                 },
-                activityLogs: activityRes.data
+                activityLogs: activityRes.data,
+                ObjectLogs: Object_activityRes.data
+
             });
 
 
@@ -399,14 +405,14 @@ const AdminDashboard = () => {
             });
             setShowConfirmModal(false);
             setAnnouncementToDelete(null);
-
-
+    
+    
         } catch (error) {
             console.error("Erreur lors de la suppression :", error);
         }
     }; */
 
-    const handleConfirmDelete = async (announcementId) => {
+    const handleConfirmDelete = async () => {
         try {
             const token = localStorage.getItem('token');
 
@@ -416,10 +422,12 @@ const AdminDashboard = () => {
             });
 
             // Récupérer les événements après suppression
-            const announcementsRes = await axios.get(`${API_BASE_URL}/admin/announcements`, {
+            const announcementsRes = await axios.get(`${API_BASE_URL}/announcements`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
+            setShowConfirmAnnonceModal(false);
+            setAnnouncementToDelete(null);
             // Mettre à jour l'état avec les événements actualisés
             setDashboardData(prev => ({
                 ...prev,
@@ -935,32 +943,30 @@ const AdminDashboard = () => {
                                             <Table striped bordered hover size="sm">
                                                 <thead>
                                                     <tr>
-                                                        <th>Nom</th>
-                                                        <th>Type</th>
-                                                        <th>Statut</th>
+                                                        <th>ID</th>
+                                                        <th>Type de modification</th>
+                                                        <th>Ancienne valeur</th>
+                                                        <th>Nouvelle valeur</th>
+                                                        <th>Date</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {dashboardData.devices
-                                                        .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+                                                    {dashboardData.ObjectLogs
+                                                        .sort((a, b) => new Date(b.date) - new Date(a.date))
                                                         .slice(0, 5)
-                                                        .map(device => (
-                                                            <tr key={device.id}>
-                                                                <td>{device.name}</td>
-                                                                <td>{device.type}</td>
-                                                                <td>
-                                                                    <Badge bg={
-                                                                        device.etat === 'actif' ? 'success' :
-                                                                            device.etat === 'maintenance' ? 'warning' : 'secondary'
-                                                                    }>
-                                                                        {device.etat}
-                                                                    </Badge>
-                                                                </td>
+                                                        .map((log) => (
+                                                            <tr key={log.id}>
+                                                                <td>{log.objectId}</td>
+                                                                <td>{log.type}</td>
+                                                                <td>{log.oldValue}</td>
+                                                                <td>{log.newValue}</td>
+                                                                <td>{new Date(log.date).toLocaleString()}</td>
                                                             </tr>
                                                         ))}
                                                 </tbody>
                                             </Table>
                                         </Card.Body>
+
                                     </Card>
                                 </Col>
                             </Row>
@@ -1629,7 +1635,7 @@ const AdminDashboard = () => {
                                                 <Button
                                                     variant="outline-danger"
                                                     size="sm"
-                                                    onClick={() => handleDeleteClick(announcement.id)}
+                                                    onClick={() => handleAnnonceDelete(announcement.id)}
                                                 >
                                                     <FaTrash />
                                                 </Button>
@@ -1671,10 +1677,19 @@ const AdminDashboard = () => {
                                             <td>{event.location}</td>
                                             <td>{event.participants}</td>
                                             <td>
-                                                <Button variant="outline-primary" size="sm" className="me-2">
+
+                                                <Button
+                                                    variant="outline-primary"
+                                                    size="sm"
+                                                    className="me-2"
+                                                    onClick={() => handleEditClick(event)}
+                                                >
                                                     <FaEdit />
                                                 </Button>
-                                                <Button variant="outline-danger" size="sm">
+                                                <Button
+                                                    variant="outline-danger"
+                                                    size="sm"
+                                                >
                                                     <FaTrash />
                                                 </Button>
                                             </td>
@@ -1955,7 +1970,7 @@ const AdminDashboard = () => {
                 </Modal.Footer>
             </Modal>
 
-            <Modal show={showConfirmModal} onHide={() => setShowConfirmModal(false)} centered>
+            <Modal show={showConfirmAnnonceModal} onHide={() => setShowConfirmAnnonceModal(false)} centered>
                 <Modal.Header closeButton>
                     <Modal.Title>Confirmer la suppression</Modal.Title>
                 </Modal.Header>
@@ -1963,7 +1978,7 @@ const AdminDashboard = () => {
                     Êtes-vous sûr de vouloir supprimer cette annonce ? Cette action est irréversible.
                 </Modal.Body>
                 <Modal.Footer>
-                    <Button variant="secondary" onClick={() => setShowConfirmModal(false)}>
+                    <Button variant="secondary" onClick={() => setShowConfirmAnnonceModal(false)}>
                         Annuler
                     </Button>
                     <Button variant="danger" onClick={handleConfirmDelete}>

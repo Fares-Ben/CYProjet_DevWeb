@@ -296,6 +296,11 @@ app.delete('/api/admin/delete-user/:id', authenticateToken, isAdmin, async (req,
       VALUES (?, ?, 'SUPPRESSION UTILISATEUR', 'Existait', 'Existe plus', NOW())`,
       [req.user.id, userId]
     );
+    await pool.query(
+      `UPDATE Users 
+      SET points = points + 1 WHERE id = ?`,
+      [req.user.id]
+    );
 
     await pool.query('COMMIT');
 
@@ -471,6 +476,12 @@ app.put('/api/admin/devices/:id', authenticateToken, async (req, res) => {
       WHERE id = ?
     `, [name, type, location, etat, consommation, deviceId]);
 
+    await pool.query(
+      `UPDATE Users 
+      SET points = points + 1 WHERE id = ?`,
+      [req.user.id]
+    );
+
     // Enregistrement des modifications
     const champs = ['name', 'type', 'location', 'etat', 'consommation'];
     for (const champ of champs) {
@@ -515,6 +526,11 @@ app.delete('/api/admin/devices/:id', authenticateToken, async (req, res) => {
     }
 
     await pool.query('DELETE FROM smart_devices WHERE id = ?', [deviceId]);
+    await pool.query(
+      `UPDATE Users 
+      SET points = points + 1 WHERE id = ?`,
+      [req.user.id]
+    );
 
     await pool.query(
       `INSERT INTO objects_activity 
@@ -579,6 +595,32 @@ app.get('/api/admin/users-activity', authenticateToken, isAdmin, async (req, res
         ua.type,
         ua.date
       FROM Users_activity ua
+      JOIN users u ON u.id = ua.ID_user_changeur
+      ORDER BY ua.date DESC
+      LIMIT 50
+    `);
+
+    res.json(activities);
+  } catch (err) {
+    console.error('Erreur:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+
+// Activités
+app.get('/api/admin/object-activity', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const [activities] = await pool.query(`
+      SELECT 
+        ua.ID_user_changeur AS userId,
+        u.pseudo,
+        ua.type,
+        ua.date,
+        ua.ID_object_modified AS objectId,
+        ua.nouvelle_donnee AS newValue,
+        ua.ancienne_donnee AS oldValue
+      FROM Objects_activity ua
       JOIN users u ON u.id = ua.ID_user_changeur
       ORDER BY ua.date DESC
       LIMIT 50
@@ -1319,7 +1361,11 @@ app.put('/api/admin/announcements/:id', authenticateToken, async (req, res) => {
       [title, content, urgent ? 1 : 0, date, id]
     );
     connection.release();
-
+    await pool.query(
+      `UPDATE Users 
+      SET points = points + 1 WHERE id = ?`,
+      [req.user.id]
+    );
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Annonce non trouvée' });
     }
@@ -1351,6 +1397,29 @@ app.delete('/api/admin/announcements/:id', authenticateToken, async (req, res) =
   } catch (error) {
     console.error('Erreur lors de la suppression de l’annonce :', error);
     res.status(500).json({ error: 'Erreur serveur lors de la suppression de l’annonce' });
+  }
+});
+
+// Supprimer un evenement
+app.delete('/api/admin/events/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const connection = await pool.getConnection();
+    const [result] = await connection.query(
+      `DELETE FROM events WHERE id = ?`,
+      [id]
+    );
+    connection.release();
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Evenement non trouvée' });
+    }
+
+    res.json({ message: 'Événement supprimé avec succès' });
+  } catch (error) {
+    console.error('Erreur lors de la suppression de l’événement :', error);
+    res.status(500).json({ error: 'Erreur serveur lors de la suppression de l’événement' });
   }
 });
 
