@@ -858,7 +858,7 @@ app.get('/api/profile', authenticateToken, async (req, res) => {
       `SELECT 
         id, pseudo, nom, prenom, date_naissance, email, 
         fonction, niveau, points, date_inscription, 
-        last_connexion, nb_connexions, nb_actions, theme_prefere
+        last_connexion, nb_connexions, nb_actions, theme_prefere, validated, email_verified
       FROM users WHERE id = ?`,
       [req.user.id]
     );

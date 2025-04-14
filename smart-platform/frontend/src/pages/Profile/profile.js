@@ -37,6 +37,8 @@ const Profile = () => {
     }).then(res => {
       setUserData(res.data);
       setFormData(res.data);
+      console.log("✅ Données utilisateur reçues :", res.data);
+
     }).catch(() => navigate('/login')); // en cas de token invalide
   }, []);
 
