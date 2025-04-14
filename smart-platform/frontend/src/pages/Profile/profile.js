@@ -1,148 +1,236 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+import {
+  Card,
+  Container,
+  Form,
+  Button,
+  Row,
+  Col,
+  Alert
+} from 'react-bootstrap';
+const API_BASE_URL = 'http://localhost:3001/api';
 
 const Profile = () => {
-  const [userInfo, setUserInfo] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [isEditing, setIsEditing] = useState(false);  // Nouveau state pour gérer l'édition
+  const [userData, setUserData] = useState({});
+  const [formData, setFormData] = useState({});
+  const [newPassword, setNewPassword] = useState('');
+  const [message, setMessage] = useState(null);
+  const navigate = useNavigate();
+  const [modeEdition, setModeEdition] = useState(false);
 
-  const token = localStorage.getItem('token');  // Récupérer le token du localStorage
-  console.log('Token récupéré :', token);
+  const handleCancel = () => {
+    setFormData(userData);       // on remet les anciennes valeurs
+    setNewPassword('');          // on vide le champ mot de passe
+    setModeEdition(false);       // on sort du mode édition
+    setMessage(null);            // on efface les messages
+  };
+
 
   useEffect(() => {
-    if (token) {
-      const fetchUserInfo = async () => {
-        try {
-          const response = await fetch('http://localhost:3001/api/profiles', {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`,
-            },
-          });
+    const token = localStorage.getItem('token');
+    if (!token) return navigate('/login');
 
-          console.log('Status de la réponse :', response.status);
+    axios.get(`${API_BASE_URL}/profile`, {
+      headers: { Authorization: `Bearer ${token}` }
+    }).then(res => {
+      setUserData(res.data);
+      setFormData(res.data);
+    }).catch(() => navigate('/login')); // en cas de token invalide
+  }, []);
 
-          if (!response.ok) {
-            if (response.status === 401) {
-              throw new Error('Non autorisé. Token invalide ou expiré.');
-            }
-            throw new Error('Erreur lors de la récupération des données.');
-          }
 
-          const data = await response.json(); // Parse directement en JSON
-          console.log('Réponse JSON :', data);
-          setUserInfo(data);
-        } catch (err) {
-          setError(err.message);
-        } finally {
-          setLoading(false);
-        }
-      };
 
-      fetchUserInfo();
-    }
-  }, [token]);
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
 
-  // Fonction pour gérer la mise à jour des données utilisateur
-  const handleUpdate = async (updatedUserInfo) => {
-    const token = localStorage.getItem('token');  // Récupérer le token depuis le localStorage
+  const handleSave = async () => {
+    const token = localStorage.getItem('token');
+    try {
+      await axios.put(`${API_BASE_URL}/profile/update`, formData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
 
-    if (token) {
-      try {
-        console.log('Contenu de updatedUserInfo :', updatedUserInfo);
-        const response = await fetch(`http://localhost:3001/api/profiles/${updatedUserInfo.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify(updatedUserInfo),  // Les nouvelles informations de l'utilisateur
+      if (formData.newPassword) {
+        await axios.put(`${API_BASE_URL}/profile/update-password`, {
+          newPassword: formData.newPassword
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
         });
-
-        const data = await response.json();
-
-        if (response.ok) {
-          alert('Informations mises à jour avec succès');
-          // Mettre à jour l'état local avec les nouvelles données
-          setUserInfo(data);
-          setIsEditing(false);  // Fermer le mode édition après la mise à jour
-          window.location.reload();
-        } else {
-          alert(data.message || 'Erreur lors de la mise à jour');
-        }
-      } catch (err) {
-        console.error('Erreur lors de la mise à jour :', err);
       }
+
+      setMessage({ type: 'success', text: 'Profil mis à jour avec succès.' });
+
+      setModeEdition(false);       // on sort du mode édition
+    } catch (err) {
+      setMessage({ type: 'danger', text: err.response?.data?.message || 'Erreur lors de la mise à jour' });
     }
   };
 
-  if (loading) {
-    return <div>Chargement...</div>;
-  }
-
-  if (error) {
-    return <div>{error}</div>;
-  }
-
   return (
-    <div className="container mt-5">
-      <h1>Profil de l'utilisateur</h1>
-      {userInfo ? (
-        <div>
-          <div className="row">
-            <div className="col-md-4">
-              {userInfo.photo && <img src={userInfo.photo} alt={userInfo.pseudo || "Utilisateur"} className="img-fluid rounded-circle" />}
-            </div>
-            <div className="col-md-8">
-              {isEditing ? (
-                // Formulaire pour modifier les données
-                <form onSubmit={(e) => { e.preventDefault(); handleUpdate(userInfo); }}>
-                  <div>
-                    <label>Nom</label>
-                    <input
-                      type="text"
-                      value={userInfo.nom}
-                      onChange={(e) => setUserInfo({ ...userInfo, nom: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label>Prénom</label>
-                    <input
-                      type="text"
-                      value={userInfo.prenom}
-                      onChange={(e) => setUserInfo({ ...userInfo, prenom: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label>Email</label>
-                    <input
-                      type="email"
-                      value={userInfo.email}
-                      onChange={(e) => setUserInfo({ ...userInfo, email: e.target.value })}
-                    />
-                  </div>
-                  <button type="submit">Enregistrer</button>
-                </form>
+    <Container className="my-5">
+      <Row className="justify-content-center">
+        <Col md={8} lg={6}>
+          <Card className="shadow rounded-4 p-4 border-0">
+            <h2 className="mb-4 text-center">Mon Profil</h2>
+
+            {message && (
+              <Alert variant={message.type}>{message.text}</Alert>
+            )}
+
+            <Form>
+              <Form.Group className="mb-3">
+                <Form.Label>Nom</Form.Label>
+                <Form.Control
+                  name="nom"
+                  value={formData.nom || ''}
+                  onChange={handleChange}
+                  disabled={!modeEdition}
+
+                />
+              </Form.Group>
+
+              <Form.Group className="mb-3">
+                <Form.Label>Prénom</Form.Label>
+                <Form.Control
+                  name="prenom"
+                  value={formData.prenom || ''}
+                  onChange={handleChange}
+                  disabled={!modeEdition}
+
+                />
+              </Form.Group>
+
+              <Form.Group className="mb-3">
+                <Form.Label>Email (non-modifible), se tourner vers un admin pour modifier</Form.Label>
+                <Form.Control
+                  name="email"
+                  value={formData.email || ''}
+                  onChange={handleChange}
+                  type="email"
+                  disabled={1}
+
+                />
+              </Form.Group>
+
+              <Form.Group className="mb-3">
+                <Form.Label>Pseudo (non-modifible), se tourner vers un admin pour modifier</Form.Label>
+                <Form.Control
+                  name="pseudo"
+                  value={formData.pseudo || ''}
+                  onChange={handleChange}
+                  disabled={1}
+
+                />
+              </Form.Group>
+
+              <Form.Group className="mb-3">
+                <Form.Label>Nouveau mot de passe</Form.Label>
+                <Form.Control
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Laisser vide si inchangé"
+                  disabled={!modeEdition}
+                />
+              </Form.Group>
+              <hr className="my-4" />
+              <h5 className="text-muted">Informations système</h5>
+
+              <Form.Group className="mb-3">
+                <Form.Label>ID utilisateur</Form.Label>
+                <Form.Control value={userData.id || ''} disabled />
+              </Form.Group>
+
+              <Form.Group className="mb-3">
+                <Form.Label>Fonction</Form.Label>
+                <Form.Control value={userData.fonction || ''} disabled />
+              </Form.Group>
+
+              <Form.Group className="mb-3">
+                <Form.Label>Niveau</Form.Label>
+                <Form.Control value={userData.niveau || ''} disabled />
+              </Form.Group>
+
+              <Form.Group className="mb-3">
+                <Form.Label>Points</Form.Label>
+                <Form.Control value={userData.points || 0} disabled />
+              </Form.Group>
+
+              <Form.Group className="mb-3">
+                <Form.Label>Date de naissance</Form.Label>
+                <Form.Control
+                  type="date"
+                  name="date_naissance"
+                  value={formData.date_naissance?.substring(0, 10) || ''}
+                  onChange={handleChange}
+                  disabled={!modeEdition}
+                />
+              </Form.Group>
+
+              <Form.Group className="mb-3">
+                <Form.Label>Date d'inscription</Form.Label>
+                <Form.Control value={userData.date_inscription?.replace('T', ' ').substring(0, 19) || ''} disabled />
+              </Form.Group>
+
+              <Form.Group className="mb-3">
+                <Form.Label>Dernière connexion</Form.Label>
+                <Form.Control value={userData.last_connexion?.replace('T', ' ').substring(0, 19) || ''} disabled />
+              </Form.Group>
+
+              <Form.Group className="mb-3">
+                <Form.Label>Nombre de connexions</Form.Label>
+                <Form.Control value={userData.nb_connexions || 0} disabled />
+              </Form.Group>
+
+              <Form.Group className="mb-3">
+                <Form.Label>Nombre d'actions</Form.Label>
+                <Form.Control value={userData.nb_actions || 0} disabled />
+              </Form.Group>
+
+              <Form.Group className="mb-3">
+                <Form.Label>Email vérifié</Form.Label>
+                <Form.Control value={userData.email_verified ? "Oui" : "Non"} disabled />
+              </Form.Group>
+
+              <Form.Group className="mb-3">
+                <Form.Label>Statut de validation</Form.Label>
+                <Form.Control value={userData.validated ? "Validé" : "En attente"} disabled />
+              </Form.Group>
+
+              <Form.Group className="mb-3">
+                <Form.Label>Thème préféré</Form.Label>
+                <Form.Control value={userData.theme_prefere || 'light'} disabled />
+              </Form.Group>
+
+
+
+              {modeEdition ? (
+                <div className="d-flex justify-content-between">
+                  <Button variant="secondary" onClick={handleCancel}>
+                    Annuler
+                  </Button>
+                  <Button variant="success" onClick={handleSave}>
+                    Enregistrer
+                  </Button>
+                </div>
               ) : (
-                // Affichage des informations si pas en mode édition
-                <>
-                  <p><strong>Nom :</strong> {userInfo.nom}</p>
-                  <p><strong>Prénom :</strong> {userInfo.prenom}</p>
-                  <p><strong>Date de naissance :</strong> {new Date(userInfo.date_naissance).toLocaleDateString()}</p>
-                  <p><strong>Fonction :</strong> {userInfo.fonction}</p>
-                  <p><strong>Email :</strong> {userInfo.email}</p>
-                  <p><strong>Pseudo :</strong> {userInfo.pseudo}</p>
-                  <button onClick={() => setIsEditing(true)}>Modifier</button>
-                </>
+                <div className="d-grid">
+                  <Button variant="primary" size="lg" onClick={() => setModeEdition(true)}>
+                    Modifier mon profil
+                  </Button>
+                </div>
               )}
-            </div>
-          </div>
-        </div>
-      ) : (
-        <p>Aucune information trouvée.</p>
-      )}
-    </div>
+
+
+            </Form>
+          </Card>
+        </Col>
+      </Row>
+    </Container>
   );
 };
 

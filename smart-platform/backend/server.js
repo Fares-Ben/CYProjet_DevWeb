@@ -1431,6 +1431,72 @@ app.post('/api/admin/update-password/:id', async (req, res) => {
   }
 });
 
+// ✅ Modifier ses informations personnelles
+app.put('/api/profile/update', authenticateToken, async (req, res) => {
+  const { nom, prenom, email, pseudo, fonction, date_naissance, theme_prefere } = req.body;
+
+  try {
+    const [existing] = await pool.query('SELECT * FROM users WHERE id = ?', [req.user.id]);
+    if (!existing.length) return res.status(404).json({ error: 'Utilisateur introuvable' });
+
+    const user = existing[0];
+    const updatedFields = {
+      nom: nom || user.nom,
+      prenom: prenom || user.prenom,
+      email: email || user.email,
+      pseudo: pseudo || user.pseudo,
+      fonction: fonction || user.fonction,
+      date_naissance: formatDateForDB(date_naissance || user.date_naissance),
+      theme_prefere: theme_prefere || user.theme_prefere
+    };
+
+    await pool.query(
+      `UPDATE users SET nom = ?, prenom = ?, email = ?, pseudo = ?, fonction = ?, date_naissance = ?, theme_prefere = ? WHERE id = ?`,
+      [
+        updatedFields.nom,
+        updatedFields.prenom,
+        updatedFields.email,
+        updatedFields.pseudo,
+        updatedFields.fonction,
+        updatedFields.date_naissance,
+        updatedFields.theme_prefere,
+        req.user.id
+      ]
+    );
+
+    res.json({ message: 'Profil mis à jour avec succès', updated: updatedFields });
+  } catch (err) {
+    console.error('Erreur mise à jour profil:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// ✅ Modifier son mot de passe
+app.put('/api/profile/update-password', authenticateToken, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  if (!newPassword || newPassword.length < 6) {
+    return res.status(400).json({ message: 'Mot de passe invalide (6 caractères minimum)' });
+  }
+
+  try {
+    const [users] = await pool.query('SELECT password FROM users WHERE id = ?', [req.user.id]);
+    if (!users.length) return res.status(404).json({ message: 'Utilisateur non trouvé' });
+
+    const user = users[0];
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) return res.status(401).json({ message: 'Mot de passe actuel incorrect' });
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await pool.query('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, req.user.id]);
+
+    res.json({ message: 'Mot de passe mis à jour avec succès' });
+  } catch (err) {
+    console.error('Erreur changement mot de passe:', err);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
 
 /* ************************* */
 /* DÉMARRAGE DU SERVEUR */
