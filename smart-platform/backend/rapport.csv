@@ -1,24 +1,56 @@
 Nom,Type,Location,Dernière activité
-Tableau interactif B12,tableau,Salle B12,
-Climatiseur Cour,climatisation,Cour principale,
-Imprimante R├®seau A,imprimante,Salle des profs,
-Cam├®ra Hall,cam├®ra,Entr├®e principale,
-Badgeuse Personnel,badgeuse,Entr├®e profs,
-Tableau interactif B12,tableau,Salle B12,
-Climatiseur Cour,climatisation,Cour principale,
-Imprimante R├®seau A,imprimante,Salle des profs,
-Cam├®ra Hall,cam├®ra,Entr├®e principale,
-Badgeuse Personnel,badgeuse,Entr├®e profs,
-Alarme Incendie,alarme,Toit,
-Switch R├®seau,r├®seau,Salle serveurs,
-D├®tecteur CO2,capteur,Classe CE2,
-Projecteur CP,projecteur,Classe CP,
-Tablette Enseignant,tablette,Salle CE1,
-Cam├®ra Cour,cam├®ra,Cour de r├®cr├®,
-Thermostat Salle A,thermostat,Salle A,
-Clim Salle des profs,climatisation,Salle des profs,
-Enceinte Bluetooth,audio,Salle musique,
+Climatisation Salle CE1,climatisation,Salle CE1,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Climatisation Salle CE2,climatisation,Salle CE2,
+Climatisation Salle CM1,climatisation,Salle CM1,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Tableau interactif CE1,tableau,Salle CE1,Sat Apr 12 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Tableau interactif CE2,tableau,Salle CE2,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
 Tableau interactif CM1,tableau,Salle CM1,
-Capteur de bruit,capteur,Salle CE1,
-Routeur Wi-Fi,r├®seau,Bureau Directeur,
-Badgeuse ├ël├¿ves,badgeuse,Entr├®e ├®l├¿ves,
+Caméra Entrée Élèves,caméra,Entrée Élèves,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Caméra Cour,caméra,Cour de récréation,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Caméra Toit,caméra,Toit,
+Capteur de bruit CM1,capteur,Salle CM1,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Capteur luminosité CE1,capteur,Salle CE1,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Routeur Wi-Fi Salle Serveurs,réseau,Salle Serveurs,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Routeur Wi-Fi Bureau Directeur,réseau,Bureau Directeur,
+Badgeuse Élèves,badgeuse,Entrée Élèves,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Badgeuse Personnel,badgeuse,Entrée Professeurs,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Tablette Professeur CE2,tablette,Salle CE2,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Tablette Directeur,tablette,Bureau Directeur,
+Projecteur Salle CM2,projecteur,Salle CM2,
+Projecteur Salle Polyvalente,projecteur,Salle Polyvalente,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Alarme Incendie Aile Nord,alarme,Couloir Aile Nord,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Alarme Intrusion CE2,alarme,Salle CE2,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Thermostat Salle A,thermostat,Salle A,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Thermostat Salle B,thermostat,Salle B,
+Imprimante Réseau A,imprimante,Salle des profs,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Imprimante Réseau B,imprimante,Bureau Direction,
+Climatisation Salle CE1,climatisation,Salle CE1,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Climatisation Salle CE2,climatisation,Salle CE2,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Climatisation Salle CM1,climatisation,Salle CM1,
+Climatisation Salle CM2,climatisation,Salle CM2,Sat Apr 12 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Climatisation Bureau Direction,climatisation,Bureau Directeur,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Climatisation Salle informatique,climatisation,Salle informatique,
+Climatisation Cantine,climatisation,Cantine,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Climatisation Salle des profs,climatisation,Salle des profs,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Climatisation Bibliothèque,climatisation,Bibliothèque,
+Tableau CE1,tableau,Salle CE1,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Tableau CE2,tableau,Salle CE2,
+Tableau CM1,tableau,Salle CM1,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Tableau CM2,tableau,Salle CM2,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Tableau Salle musique,tableau,Salle musique,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Tableau Salle anglais,tableau,Salle anglais,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Badgeuse Entrée Élèves,badgeuse,Entrée Élèves,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Badgeuse Entrée Profs,badgeuse,Entrée Professeurs,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Badgeuse Sport,badgeuse,Gymnase,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Badgeuse Réfectoire,badgeuse,Cantine,
+Badgeuse Visiteurs,badgeuse,Accueil,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Routeur Wi-Fi Principal,réseau,Salle Serveurs,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Routeur Wi-Fi Secondaire,réseau,Bureau Directeur,
+Routeur Wi-Fi CDI,réseau,Bibliothèque,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Routeur Gymnase,réseau,Gymnase,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Projecteur CM2,projecteur,Salle CM2,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Projecteur Salle Polyvalente,projecteur,Salle Polyvalente,
+Projecteur Cantine,projecteur,Cantine,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Projecteur Bibliothèque,projecteur,Bibliothèque,Sun Apr 13 2025 00:00:00 GMT+0200 (heure d’été d’Europe centrale)
+Projecteur Salle informatique,projecteur,Salle informatique,
+Capteur de fumée,capteur,Salle B12,

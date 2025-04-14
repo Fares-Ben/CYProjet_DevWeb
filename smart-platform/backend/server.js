@@ -1404,6 +1404,33 @@ app.put('/api/profiles/:id', authenticateToken, (req, res) => {
   });
 });
 
+// Route de mise à jour du mot de passe d’un utilisateur
+app.post('/api/admin/update-password/:id', async (req, res) => {
+  const userId = req.params.id;
+  const { newPassword } = req.body;
+
+  if (!newPassword || newPassword.length < 6) {
+    return res.status(400).json({ message: 'Mot de passe invalide (min 6 caractères).' });
+  }
+
+  try {
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const [result] = await pool.execute(
+      'UPDATE users SET password = ? WHERE id = ?',
+      [hashedPassword, userId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Utilisateur introuvable." });
+    }
+
+    res.json({ message: 'Mot de passe mis à jour avec succès' });
+  } catch (error) {
+    console.error('Erreur mise à jour du mot de passe:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
 
 /* ************************* */
 /* DÉMARRAGE DU SERVEUR */
