@@ -76,7 +76,7 @@ const authenticateToken = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.SECRET_KEY);
 
     const [users] = await pool.query(
-      'SELECT id, pseudo, niveau, fonction FROM users WHERE id = ?',
+      'SELECT id, pseudo, niveau, fonction, validated FROM users WHERE id = ?',
       [decoded.id]
     );
 
@@ -140,6 +140,16 @@ app.get('/api/smart-devices', async (req, res) => {
   try {
     const [devices] = await pool.query('SELECT * FROM smart_devices');
     res.json(devices);
+  } catch (err) {
+    console.error('Erreur:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+app.get('/api/users', async (req, res) => {
+  try {
+    const [users] = await pool.query('SELECT * FROM users');
+    res.json(users);
   } catch (err) {
     console.error('Erreur:', err);
     res.status(500).json({ error: 'Erreur serveur' });
@@ -432,7 +442,7 @@ app.post('/api/admin/devices', authenticateToken, isAdmin, async (req, res) => {
   }
 });
 
-app.put('/api/admin/devices/:id', authenticateToken, isAdmin, async (req, res) => {
+app.put('/api/admin/devices/:id', authenticateToken, async (req, res) => {
   try {
     const deviceId = req.params.id;
     const {
@@ -493,7 +503,7 @@ app.put('/api/admin/devices/:id', authenticateToken, isAdmin, async (req, res) =
   }
 });
 
-app.delete('/api/admin/devices/:id', authenticateToken, isAdmin, async (req, res) => {
+app.delete('/api/admin/devices/:id', authenticateToken, async (req, res) => {
   try {
     const deviceId = req.params.id;
 
@@ -975,8 +985,8 @@ app.get('/api/admin/generate-report', async (req, res) => {
     try {
       if (type === 'energy') {
 
-        const [rows] = await db.promise().query('SELECT SUM(consommation) as consoTotale, COUNT(*) as count FROM smart_devices');
-        const [conso] = await db.promise().query('SELECT name, consommation FROM smart_devices GROUP BY name ORDER BY consommation DESC LIMIT 1');
+        const [rows] = await pool.query('SELECT SUM(consommation) as consoTotale, COUNT(*) as count FROM smart_devices');
+        const [conso] = await pool.query('SELECT name, consommation FROM smart_devices GROUP BY name ORDER BY consommation DESC LIMIT 1');
 
         const tot = rows[0].consoTotale;
         const nb = rows[0].count;
@@ -1001,8 +1011,8 @@ app.get('/api/admin/generate-report', async (req, res) => {
         doc.end();
       } else if (type === 'users') {
 
-        const [rows] = await db.promise().query('SELECT COUNT(*) as count FROM smart_devices');
-        const [act] = await db.promise().query('SELECT nom, prenom, nb_actions FROM users GROUP BY nom ORDER BY nb_actions DESC LIMIT 1');
+        const [rows] = await pool.query('SELECT COUNT(*) as count FROM smart_devices');
+        const [act] = await pool.query('SELECT nom, prenom, nb_actions FROM users GROUP BY nom ORDER BY nb_actions DESC LIMIT 1');
 
         const tot = rows[0].consoTotale;
         const nb = rows[0].count;
@@ -1027,8 +1037,8 @@ app.get('/api/admin/generate-report', async (req, res) => {
         doc.end();
       } else {
 
-        const [rows] = await db.promise().query('SELECT COUNT(*) as count FROM smart_devices');
-        const [act] = await db.promise().query('SELECT name, Date_derniere_activite FROM smart_devices GROUP BY name ORDER BY Date_derniere_activite DESC LIMIT 1');
+        const [rows] = await pool.query('SELECT COUNT(*) as count FROM smart_devices');
+        const [act] = await pool.query('SELECT name, Date_derniere_activite FROM smart_devices GROUP BY name ORDER BY Date_derniere_activite DESC LIMIT 1');
 
         const nb = rows[0].count;
         const max = act[0].name;
@@ -1056,7 +1066,7 @@ app.get('/api/admin/generate-report', async (req, res) => {
   } else {
     try {
       if (type === 'energy') {
-        const [rows] = await db.promise().query('SELECT name, type, location, consommation FROM smart_devices');
+        const [rows] = await pool.query('SELECT name, type, location, consommation FROM smart_devices');
 
         const csvPath = path.join(__dirname, 'rapport.csv');
         const csvWriter = createObjectCsvWriter({
@@ -1076,7 +1086,7 @@ app.get('/api/admin/generate-report', async (req, res) => {
         res.sendFile(csvPath);
 
       } else if (type === 'users') {
-        const [rows] = await db.promise().query('SELECT nom, prenom, fonction, niveau, nb_actions FROM users');
+        const [rows] = await pool.query('SELECT nom, prenom, fonction, niveau, nb_actions FROM users');
 
         const csvPath = path.join(__dirname, 'rapport.csv');
         const csvWriter = createObjectCsvWriter({
@@ -1097,7 +1107,7 @@ app.get('/api/admin/generate-report', async (req, res) => {
         res.sendFile(csvPath);
 
       } else {
-        const [rows] = await db.promise().query('SELECT name, type, location, Date_derniere_activite FROM smart_devices');
+        const [rows] = await pool.query('SELECT name, type, location, Date_derniere_activite FROM smart_devices');
 
         const csvPath = path.join(__dirname, 'rapport.csv');
         const csvWriter = createObjectCsvWriter({

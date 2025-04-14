@@ -219,10 +219,16 @@ const AdminDashboard = () => {
                     totalEvents: eventsRes.data.length,
                     totalAnnouncements: announcementsRes.data.length,
                     pendingRequests: pendingRes.data.length,
-                    totalUsers: usersRes.data.length
+                    totalUsers: usersRes.data.length,
+
+                    // 👇 Calcul dynamique de la consommation énergétique totale
+                    energyConsumption: devicesRes.data
+                        .filter(d => d.etat === 'actif')
+                        .reduce((sum, d) => sum + (Number(d.consommation) || 0), 0)
                 },
                 activityLogs: activityRes.data
             });
+
 
             setIsLoading(false);
         } catch (err) {
@@ -857,35 +863,45 @@ const AdminDashboard = () => {
                                         </Button>
                                     </Card.Footer>
                                 </Card>
-                            </div>
-
-                            {/* Energy Consumption */}
-                            <Card className="mb-4">
+                            </div><Card className="mb-4">
                                 <Card.Body>
                                     <Card.Title>Consommation énergétique</Card.Title>
+
                                     <div className="energy-stats">
-                                        <div className="energy-value">
-                                            <span>{dashboardData.stats.energyConsumption}</span> kWh
+                                        <div className="d-flex justify-content-between align-items-center mb-2">
+                                            <span className="fw-bold">Total actuel</span>
+                                            <span className="fs-4">
+                                                ⚡ {dashboardData.stats.energyConsumption} <small className="text-muted">kWh</small>
+                                            </span>
                                         </div>
+
                                         <ProgressBar
-                                            now={Math.min(100, dashboardData.stats.energyConsumption / 1000 * 100)}
-                                            label={`${Math.round(dashboardData.stats.energyConsumption / 1000 * 100)}%`}
-                                            variant="warning"
+                                            now={Math.min(100, (dashboardData.stats.energyConsumption / 30000) * 100)}
+                                            label={`${Math.round((dashboardData.stats.energyConsumption / 30000) * 100)}% du seuil`}
+                                            variant={dashboardData.stats.energyConsumption > 900 ? "danger" : "warning"}
                                             className="mb-3"
                                         />
-                                        <div className="energy-comparison">
+
+                                        <div className="text-muted small">
+                                            Seuil de référence : <strong>30 000 kWh</strong> / mois
+                                        </div>
+
+                                        <div className="mt-2 text-end">
                                             <span className={
                                                 (dashboardData?.stats?.monthlyComparison?.energy ?? 0) >= 0
-                                                    ? "text-danger"
-                                                    : "text-success"
+                                                    ? "text-danger fw-bold"
+                                                    : "text-success fw-bold"
                                             }>
-                                                {(dashboardData?.stats?.monthlyComparison?.energy ?? 0) >= 0 ? '↑' : '↓'}
+                                                {(dashboardData?.stats?.monthlyComparison?.energy ?? 0) >= 0 ? '⬆️' : '⬇️'}
                                                 {Math.abs(dashboardData?.stats?.monthlyComparison?.energy ?? 0)}%
                                             </span>
+                                            <small className="text-muted ms-1">par rapport au mois précédent</small>
                                         </div>
                                     </div>
                                 </Card.Body>
                             </Card>
+
+
 
                             {/* Recent Activity */}
                             <Row>
@@ -1108,46 +1124,61 @@ const AdminDashboard = () => {
                                         <Card.Body>
                                             <Card.Title>Répartition par type</Card.Title>
                                             <div className="device-type-chart">
-                                                {dashboardData.devices.length > 0 ? (
-                                                    <>
-                                                        <ProgressBar className="mb-2">
-                                                            <ProgressBar
-                                                                variant="primary"
-                                                                now={(dashboardData.devices.filter(d => d.type === 'tableau').length / dashboardData.devices.length) * 100}
-                                                                key={1}
-                                                                label={`Tableaux (${dashboardData.devices.filter(d => d.type === 'tableau').length})`}
-                                                            />
-                                                        </ProgressBar>
-                                                        <ProgressBar className="mb-2">
-                                                            <ProgressBar
-                                                                variant="success"
-                                                                now={(dashboardData.devices.filter(d => d.type === 'climatisation').length / dashboardData.devices.length) * 100}
-                                                                key={2}
-                                                                label={`Climatisation (${dashboardData.devices.filter(d => d.type === 'climatisation').length})`}
-                                                            />
-                                                        </ProgressBar>
-                                                        <ProgressBar className="mb-2">
-                                                            <ProgressBar
-                                                                variant="info"
-                                                                now={(dashboardData.devices.filter(d => d.type === 'securite').length / dashboardData.devices.length) * 100}
-                                                                key={3}
-                                                                label={`Sécurité (${dashboardData.devices.filter(d => d.type === 'securite').length})`}
-                                                            />
-                                                        </ProgressBar>
-                                                        <ProgressBar>
-                                                            <ProgressBar
-                                                                variant="secondary"
-                                                                now={(dashboardData.devices.filter(d => !['tableau', 'climatisation', 'securite'].includes(d.type)).length / dashboardData.devices.length) * 100}
-                                                                key={4}
-                                                                label={`Autre (${dashboardData.devices.filter(d => !['tableau', 'climatisation', 'securite'].includes(d.type)).length})`}
-                                                            />
-                                                        </ProgressBar>
-                                                    </>
-                                                ) : (
+                                                {dashboardData.devices.length > 0 ? (() => {
+                                                    const total = dashboardData.devices.length;
+
+                                                    const typeLabels = {
+                                                        tableau: 'Tableaux',
+                                                        climatisation: 'Climatisation',
+                                                        securite: 'Sécurité',
+                                                        projecteur: 'Projecteurs',
+                                                        camera: 'Caméras',
+                                                        réseau: 'Réseau',
+                                                        badgeuse: 'Badgeuses',
+                                                        capteur: 'Capteurs',
+                                                        tablette: 'Tablettes'
+                                                    };
+
+                                                    const mainTypes = Object.keys(typeLabels);
+
+                                                    const counts = mainTypes.reduce((acc, type) => {
+                                                        acc[type] = dashboardData.devices.filter(d => d.type === type).length;
+                                                        return acc;
+                                                    }, {});
+
+                                                    const countAutres = dashboardData.devices.filter(d => !mainTypes.includes(d.type)).length;
+
+                                                    return (
+                                                        <>
+                                                            {mainTypes.map((type, index) =>
+                                                                counts[type] > 0 && (
+                                                                    <ProgressBar className="mb-2" key={index}>
+                                                                        <ProgressBar
+                                                                            variant="info"
+                                                                            now={(counts[type] / total) * 100}
+                                                                            label={`${typeLabels[type]} (${counts[type]})`}
+                                                                        />
+                                                                    </ProgressBar>
+                                                                )
+                                                            )}
+                                                            {countAutres > 0 && (
+                                                                <ProgressBar className="mb-2">
+                                                                    <ProgressBar
+                                                                        variant="secondary"
+                                                                        now={(countAutres / total) * 100}
+                                                                        label={`Autre (${countAutres})`}
+                                                                    />
+                                                                </ProgressBar>
+                                                            )}
+                                                        </>
+                                                    );
+                                                })() : (
                                                     <Alert variant="info">Aucun appareil enregistré</Alert>
                                                 )}
                                             </div>
                                         </Card.Body>
+
+
                                     </Card>
                                 </Col>
                                 <Col md={4}>

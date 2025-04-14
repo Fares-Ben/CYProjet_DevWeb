@@ -27,6 +27,7 @@ import {
     FaTrash,
     FaUsers,
     FaCog,
+    FaEye,
     FaChartLine,
 } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
@@ -53,6 +54,9 @@ const VisitorHome = () => {
     const [userData, setUserData] = useState(null);
     const [userLevel, setUserLevel] = useState('visitor');
     const [showEditModal, setShowEditModal] = useState(false);
+    const [selectedUser, setSelectedUser] = useState(null);
+    const [showUserModal, setShowUserModal] = useState(false);
+
     const [currentDevice, setCurrentDevice] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [deviceForm, setDeviceForm] = useState({});
@@ -71,15 +75,29 @@ const VisitorHome = () => {
             const data = await response.json();
 
             if (response.ok) {
+                if (data.user.niveau === 'admin') {
+                    navigate('/admindashboard');
+                    return;
+                }
+
                 setIsLoggedIn(true);
                 setUserData(data.user);
-                setUserLevel(data.user.niveau);
+                console.log("USER REÇU DU TOKEN:", data.user);
+
+
+                if (data.user.validated === 0) {
+                    setUserLevel('non-validated'); // blocage total
+                } else {
+                    setUserLevel(data.user.niveau);
+                }
+
                 console.log('Token vérifié');
             }
         } catch (error) {
             console.error('Erreur:', error);
         }
     };
+
 
     // Chargement des données et vérification de l'authentification
     useEffect(() => {
@@ -117,18 +135,18 @@ const VisitorHome = () => {
                         'Content-Type': 'application/json'
                     }
                 }),
-                isLoggedIn ? fetch(`${API_BASE_URL}/users`, {
+                fetch(`${API_BASE_URL}/users`, {
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
                     }
-                }) : Promise.resolve(null)
+                })
             ]);
 
             const [announcements, events, smartDevices] = await Promise.all([
                 announcementsRes.json(),
                 eventsRes.json(),
-                devicesRes.json()
+                devicesRes.json(),
             ]);
 
             let users = [];
@@ -137,6 +155,7 @@ const VisitorHome = () => {
             }
 
             setSchoolData({ announcements, events, smartDevices, users });
+
         } catch (error) {
             console.error('Erreur lors du chargement des données:', error);
         }
@@ -156,20 +175,22 @@ const VisitorHome = () => {
             name: device.name,
             type: device.type,
             location: device.location,
-            status: device.status
+            etat: device.etat
         });
         setShowEditModal(true);
     };
 
     const handleDeviceUpdate = async () => {
+        const token = localStorage.getItem('token');
+
         try {
-            const response = await fetch(`${API_BASE_URL}/smart-devices/${currentDevice.id}`, {
+            const response = await fetch(`${API_BASE_URL}/admin/devices/${currentDevice.id}`, {
                 method: 'PUT',
+                body: JSON.stringify(deviceForm),
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': localStorage.getItem('token')
-                },
-                body: JSON.stringify(deviceForm)
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
             });
 
             if (response.ok) {
@@ -182,12 +203,15 @@ const VisitorHome = () => {
     };
 
     const handleDeviceDelete = async (deviceId) => {
+        const token = localStorage.getItem('token');
+
         if (window.confirm('Êtes-vous sûr de vouloir supprimer cet appareil ?')) {
             try {
-                const response = await fetch(`${API_BASE_URL}/smart-devices/${deviceId}`, {
+                const response = await fetch(`${API_BASE_URL}/admin/devices/${deviceId}`, {
                     method: 'DELETE',
                     headers: {
-                        'Authorization': localStorage.getItem('token')
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
                     }
                 });
 
@@ -278,16 +302,26 @@ const VisitorHome = () => {
             {/* Hero Section - Message différent si connecté */}
             <div className="school-hero">
                 <div className="hero-content">
-                    <h1>École Primaire Les Petits Génies</h1>
-                    {isLoggedIn ? (
+                    <h1>École Primaire Les Petits Génies</h1>{isLoggedIn ? (
                         <>
                             <p className="lead">Bienvenue, {userData?.pseudo} !</p>
-                            <p>Vous avez accès aux fonctionnalités {userLevel === 'simple' ? 'de base' :
-                                userLevel === 'complexe' ? 'avancées' : 'd\'administration'}.</p>
+
+                            {userData?.validated == 0 ? (
+                                <Alert variant="warning" className="mt-3 text-center fw-bold">
+                                    ⚠️ Votre compte est en attente de validation par un administrateur.
+                                    <br />Vous êtes actuellement en mode lecture seule.
+                                </Alert>
+                            ) : (
+                                <p>
+                                    Vous avez accès aux fonctionnalités {userLevel === 'simple' ? 'de base' :
+                                        userLevel === 'complexe' ? 'avancées' : 'd\'administration'}.
+                                </p>
+                            )}
                         </>
                     ) : (
                         <p className="lead">L'innovation au service de l'éducation</p>
                     )}
+
 
                     <div className="hero-stats">
                         <div className="stat-item">
@@ -452,10 +486,10 @@ const VisitorHome = () => {
                                         <div className="device-header">
                                             <Card.Title>{device.name}</Card.Title>
                                             <Badge
-                                                bg={device.status === 'actif' ? 'success' :
-                                                    device.status === 'maintenance' ? 'warning' : 'secondary'}
+                                                bg={device.etat === 'actif' ? 'success' :
+                                                    device.etat === 'maintenance' ? 'warning' : 'secondary'}
                                             >
-                                                {device.status}
+                                                {device.etat}
                                             </Badge>
                                         </div>
                                         <Card.Subtitle className="mb-2 text-muted">
@@ -471,7 +505,7 @@ const VisitorHome = () => {
                                         <Button variant="primary" size="sm" className="me-2">
                                             Contrôler
                                         </Button> */}
-                                        {isLoggedIn && (userLevel === 'complexe' || userLevel === 'admin') && (
+                                        {isLoggedIn && userLevel !== 'non-validated' && (
                                             <>
                                                 <Button
                                                     variant="outline-warning"
@@ -481,6 +515,10 @@ const VisitorHome = () => {
                                                 >
                                                     <FaEdit />
                                                 </Button>
+                                            </>
+                                        )}
+                                        {isLoggedIn && userLevel !== 'non-validated' && (userLevel === 'complexe' || userLevel === 'admin') && (
+                                            <>
                                                 <Button
                                                     variant="outline-danger"
                                                     size="sm"
@@ -499,20 +537,13 @@ const VisitorHome = () => {
 
 
                 {/* Section Utilisateurs (visible seulement pour les admins) */}
-                {isLoggedIn && userLevel === 'admin' && (
+                {isLoggedIn && userLevel !== 'non-validated' && (
                     <section className="mb-5">
                         <div className="d-flex justify-content-between align-items-center mb-4">
                             <h2 className="section-title m-0">
                                 <FaUsers className="me-2" />
                                 Utilisateurs
                             </h2>
-                            <Button
-                                variant="primary"
-                                size="sm"
-                                onClick={() => navigate('/add-user')}
-                            >
-                                Ajouter un utilisateur
-                            </Button>
                         </div>
 
                         <Card>
@@ -533,19 +564,25 @@ const VisitorHome = () => {
                                                 <td>{user.pseudo}</td>
                                                 <td>
                                                     <Badge bg={
-                                                        user.level === 'admin' ? 'danger' :
-                                                            user.level === 'complexe' ? 'warning' : 'primary'
+                                                        user.niveau === 'admin' ? 'danger' :
+                                                            user.niveau === 'complexe' ? 'warning' : 'primary'
                                                     }>
-                                                        {user.level}
+                                                        {user.niveau}
                                                     </Badge>
                                                 </td>
                                                 <td>
-                                                    <Button variant="outline-primary" size="sm" className="me-2">
-                                                        <FaEdit />
+                                                    <Button
+                                                        variant="outline-primary"
+                                                        size="sm"
+                                                        className="me-2"
+                                                        onClick={() => {
+                                                            setSelectedUser(user);
+                                                            setShowUserModal(true);
+                                                        }}
+                                                    >
+                                                        <FaEye />
                                                     </Button>
-                                                    <Button variant="outline-danger" size="sm">
-                                                        <FaTrash />
-                                                    </Button>
+
                                                 </td>
                                             </tr>
                                         ))}
@@ -605,57 +642,95 @@ const VisitorHome = () => {
                 </Container>
             </div>
 
+            <Modal show={showUserModal} onHide={() => setShowUserModal(false)}>
+                <Modal.Header closeButton>
+                    <Modal.Title>Informations de l'utilisateur</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    {selectedUser ? (
+                        <>
+                            <p><strong>ID :</strong> {selectedUser.id}</p>
+                            <p><strong>Nom :</strong> {selectedUser.nom}</p>
+                            <p><strong>Prénom :</strong> {selectedUser.prenom}</p>
+                            <p><strong>Fonction :</strong> {selectedUser.fonction}</p>
+                            <p><strong>Pseudo :</strong> {selectedUser.pseudo}</p>
+                            <p><strong>Niveau :</strong> {selectedUser.niveau}</p>
+                            <p><strong>Email :</strong> {selectedUser.email || 'Non renseigné'}</p>
+                            <p><strong>Validé :</strong> {selectedUser.validated ? 'Oui' : 'Non'}</p>
+                        </>
+                    ) : (
+                        <p>Aucun utilisateur sélectionné.</p>
+                    )}
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={() => setShowUserModal(false)}>
+                        Fermer
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+
+
             {/* Modal pour l'édition d'appareil */}
             <Modal show={showEditModal} onHide={() => setShowEditModal(false)}>
                 <Modal.Header closeButton>
                     <Modal.Title>Modifier l'appareil</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
-                    <Form>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Nom</Form.Label>
-                            <Form.Control
-                                type="text"
-                                name="name"
-                                value={deviceForm.name || ''}
-                                onChange={handleFormChange}
-                            />
-                        </Form.Group>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Type</Form.Label>
-                            <Form.Select
-                                name="type"
-                                value={deviceForm.type || ''}
-                                onChange={handleFormChange}
-                            >
-                                <option value="tableau">Tableau interactif</option>
-                                <option value="climatisation">Climatisation</option>
-                                <option value="securite">Sécurité</option>
-                            </Form.Select>
-                        </Form.Group>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Localisation</Form.Label>
-                            <Form.Control
-                                type="text"
-                                name="location"
-                                value={deviceForm.location || ''}
-                                onChange={handleFormChange}
-                            />
-                        </Form.Group>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Statut</Form.Label>
-                            <Form.Select
-                                name="status"
-                                value={deviceForm.status || ''}
-                                onChange={handleFormChange}
-                            >
-                                <option value="actif">Actif</option>
-                                <option value="maintenance">Maintenance</option>
-                                <option value="inactif">Inactif</option>
-                            </Form.Select>
-                        </Form.Group>
-                    </Form>
+                    {isLoggedIn && (
+                        <Form>
+                            {(userLevel === 'simple' || userLevel === 'admin') && userData?.validated !== 0 && (
+                                <>
+                                    <Form.Group className="mb-3">
+                                        <Form.Label>Nom</Form.Label>
+                                        <Form.Control
+                                            type="text"
+                                            name="name"
+                                            value={deviceForm.name || ''}
+                                            onChange={handleFormChange}
+                                        />
+                                    </Form.Group>
+                                    <Form.Group className="mb-3">
+                                        <Form.Label>Type</Form.Label>
+                                        <Form.Select
+                                            name="type"
+                                            value={deviceForm.type || ''}
+                                            onChange={handleFormChange}
+                                        >
+                                            <option value="tableau">Tableau interactif</option>
+                                            <option value="climatisation">Climatisation</option>
+                                            <option value="securite">Sécurité</option>
+                                        </Form.Select>
+                                    </Form.Group>
+                                    <Form.Group className="mb-3">
+                                        <Form.Label>Localisation</Form.Label>
+                                        <Form.Control
+                                            type="text"
+                                            name="location"
+                                            value={deviceForm.location || ''}
+                                            onChange={handleFormChange}
+                                        />
+                                    </Form.Group>
+                                </>
+                            )}
+
+                            {/* Tous les utilisateurs connectés peuvent modifier le statut */}
+                            <Form.Group className="mb-3">
+                                <Form.Label>Statut</Form.Label>
+                                <Form.Select
+                                    name="etat"
+                                    value={deviceForm.etat || ''}
+                                    onChange={handleFormChange}
+                                    disabled={userLevel === 'visitor'}
+                                >
+                                    <option value="actif">Actif</option>
+                                    <option value="maintenance">Maintenance</option>
+                                    <option value="inactif">Inactif</option>
+                                </Form.Select>
+                            </Form.Group>
+                        </Form>
+                    )}
                 </Modal.Body>
+
                 <Modal.Footer>
                     <Button variant="secondary" onClick={() => setShowEditModal(false)}>
                         Annuler
